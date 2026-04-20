@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCNV Multi-Agent System — Business Presentation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0F172A;
+      --accent: #6366f1;
+      --accent2: #06b6d4;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #1e293b;
+      --muted: #64748b;
+      --light: #f8fafc;
+      --border: #e2e8f0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--primary);
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ── Slide Container ────────────────────────────────── */
+    .slide-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .slide.active {
+      display: flex;
+    }
+
+    /* ── Navigation ─────────────────────────────────────── */
+    .nav-controls {
+      position: fixed;
+      bottom: 24px;
+      right: 32px;
+      display: flex;
+      gap: 10px;
+      z-index: 9999;
+      align-items: center;
+    }
+
+    .nav-controls .slide-counter {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.7);
+      padding: 0 12px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 20px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      backdrop-filter: blur(10px);
+    }
+
+    .nav-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+    }
+
+    .nav-btn:hover {
+      background: rgba(99, 102, 241, 0.6);
+      border-color: #6366f1;
+      transform: scale(1.1);
+    }
+
+    /* ── Common Slide Layouts ──────────────────────────── */
+    .slide-dark {
+      background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+      color: white;
+      padding: 60px 80px;
+      justify-content: center;
+    }
+
+    .slide-light {
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      color: var(--text);
+      padding: 50px 80px;
+    }
+
+    .slide-gradient {
+      background: linear-gradient(135deg, #6366f1 0%, #4338ca 30%, #0F172A 100%);
+      color: white;
+      padding: 60px 80px;
+      justify-content: center;
+    }
+
+    .slide-accent {
+      background: linear-gradient(135deg, #0F172A 0%, #1E293B 40%, #312e81 100%);
+      color: white;
+      padding: 50px 80px;
+    }
+
+    /* ── Title Slide Styles ────────────────────────────── */
+    .title-slide {
+      align-items: center;
+      text-align: center;
+    }
+
+    .title-slide .logo-badge {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: rgba(255, 255, 255, 0.5);
+      margin-bottom: 24px;
+    }
+
+    .title-slide h1 {
+      font-size: 3.8rem;
+      font-weight: 900;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      background: linear-gradient(135deg, #fff 0%, #a5b4fc 50%, #06b6d4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .title-slide .subtitle {
+      font-size: 1.25rem;
+      color: rgba(255, 255, 255, 0.6);
+      max-width: 700px;
+      line-height: 1.7;
+    }
+
+    .title-slide .meta {
+      margin-top: 40px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.35);
+      letter-spacing: 1px;
+    }
+
+    /* ── Section header slide ──────────────────────────── */
+    .section-header h2 {
+      font-size: 2.8rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 18px;
+    }
+
+    .section-header .lead {
+      font-size: 1.15rem;
+      color: rgba(255, 255, 255, 0.55);
+      max-width: 650px;
+      line-height: 1.7;
+    }
+
+    .section-number {
+      font-size: 80px;
+      font-weight: 900;
+      opacity: 0.08;
+      position: absolute;
+      top: 40px;
+      right: 60px;
+    }
+
+    /* ── Content Slide Styles ──────────────────────────── */
+    .content-header {
+      margin-bottom: 40px;
+    }
+
+    .content-header .tag {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .content-header h2 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .content-header-dark h2 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: white;
+    }
+
+    .content-header-dark .tag {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #818cf8;
+      margin-bottom: 10px;
+    }
+
+    /* ── Cards Grid ────────────────────────────────────── */
+    .cards-grid {
+      display: grid;
+      gap: 20px;
+      flex: 1;
+    }
+
+    .cards-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .cards-2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .cards-4 {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .cards-5 {
+      grid-template-columns: repeat(5, 1fr);
+    }
+
+    .card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+    }
+
+    .card-dark {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 28px;
+      color: white;
+    }
+
+    .card .icon-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+
+    .card-dark .icon-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+
+    .card h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .card-dark h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: white;
+    }
+
+    .card p,
+    .card-dark p {
+      font-size: 0.88rem;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    .card-dark p {
+      color: rgba(255, 255, 255, 0.55);
+    }
+
+    /* ── Flow / Pipeline ───────────────────────────────── */
+    .pipeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      justify-content: center;
+      margin-top: 30px;
+    }
+
+    .pipeline-step {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 22px 28px;
+      text-align: center;
+      min-width: 160px;
+    }
+
+    .pipeline-step .step-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .pipeline-step h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 4px;
+    }
+
+    .pipeline-step p {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .pipeline-arrow {
+      font-size: 24px;
+      color: rgba(255, 255, 255, 0.3);
+      padding: 0 8px;
+    }
+
+    /* ── Table ──────────────────────────────────────────── */
+    .styled-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    }
+
+    .styled-table th {
+      background: var(--primary);
+      color: white;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 14px 20px;
+      text-align: left;
+    }
+
+    .styled-table td {
+      padding: 14px 20px;
+      font-size: 0.88rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .styled-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .styled-table tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .badge-green {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .badge-red {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .badge-yellow {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .badge-blue {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .badge-purple {
+      background: #ede9fe;
+      color: #5b21b6;
+    }
+
+    /* ── KPI Metric Cards ──────────────────────────────── */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .kpi-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .kpi-card .kpi-value {
+      font-size: 2.2rem;
+      font-weight: 900;
+      margin-bottom: 6px;
+    }
+
+    .kpi-card .kpi-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Two Column ────────────────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      flex: 1;
+      align-items: start;
+    }
+
+    .two-col-60-40 {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 40px;
+      flex: 1;
+      align-items: start;
+    }
+
+    /* ── List Styles ───────────────────────────────────── */
+    .feature-list {
+      list-style: none;
+    }
+
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 12px 0;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .feature-list li:last-child {
+      border-bottom: none;
+    }
+
+    .feature-list .li-icon {
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      border-radius: 8px;
+      background: rgba(99, 102, 241, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .feature-list .li-text strong {
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .feature-list .li-text span {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 0.85rem;
+    }
+
+    .feature-list-light li {
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .feature-list-light .li-icon {
+      background: #eef2ff;
+    }
+
+    .feature-list-light .li-text span {
+      color: var(--muted);
+    }
+
+    /* ── Diagram / Flow Box ────────────────────────────── */
+    .flow-diagram {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+    }
+
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .flow-node {
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #c7d2fe;
+      text-align: center;
+      min-width: 110px;
+    }
+
+    .flow-node.highlight {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #a7f3d0;
+    }
+
+    .flow-node.warning {
+      background: rgba(245, 158, 11, 0.2);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fde68a;
+    }
+
+    .flow-arrow-down {
+      text-align: center;
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* ── Decorative ────────────────────────────────────── */
+    .glow-circle {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.15;
+      pointer-events: none;
+    }
+
+    /* ── Progress bar ──────────────────────────────────── */
+    .progress-bar-bg {
+      width: 100%;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    /* ── Animations ────────────────────────────────────── */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .slide.active>* {
+      animation: fadeInUp 0.5s ease-out forwards;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="slide-container">
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 1: Title Slide                                                      -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-gradient title-slide active" id="slide-1">
+      <div class="glow-circle" style="width:500px;height:500px;background:#6366f1;top:-100px;right:-100px;"></div>
+      <div class="glow-circle" style="width:400px;height:400px;background:#06b6d4;bottom:-100px;left:-50px;"></div>
+      <div class="logo-badge">OFI SERVICES — CONFIDENTIAL</div>
+      <h1>SCNV Multi-Agent<br>System</h1>
+      <p class="subtitle">
+        AI-Powered Supply Chain Network Visibility — Transforming how we classify, optimise, and execute
+        Stock Transfer Orders across a global distribution network.
+      </p>
+      <p class="meta">APRIL 2026 &nbsp;•&nbsp; PREPARED FOR SENIOR LEADERSHIP</p>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 2: Business Problem                                                 -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-light" id="slide-2">
+      <div class="content-header">
+        <div class="tag">The Business Challenge</div>
+        <h2>Why We Built SCNV</h2>
+      </div>
+
+      <div class="cards-grid cards-3" style="align-items:start;">
+        <div class="card" style="border-top: 3px solid #ef4444;">
+          <div class="icon-circle" style="background:#fee2e2;color:#dc2626;">⚠️</div>
+          <h3>Unproductive Transfers</h3>
+          <p>A significant portion of inter-plant and DC-to-DC stock transfers are lateral or reverse movements that add
+            cost but deliver no value to the end customer. Manual identification is time-consuming and error-prone.</p>
+        </div>
+        <div class="card" style="border-top: 3px solid #f59e0b;">
+          <div class="icon-circle" style="background:#fef3c7;color:#d97706;">🔍</div>
+          <h3>Lack of Real-Time Visibility</h3>
+          <p>Supply chain teams lack a single dashboard that shows the health of the distribution network — from
+            allocation efficiency to customer fulfilment accuracy — leading to delayed and reactive decision-making.</p>
+        </div>
+        <div class="card" style="border-top: 3px solid #6366f1;">
+          <div class="icon-circle" style="background:#eef2ff;color:#4f46e5;">🤖</div>
+          <h3>Manual Decision Bottlenecks</h3>
+          <p>Decisions on whether to approve, re-route, or reject a transfer order require consulting multiple SAP
+            tables, master data files, and people. This creates delays and inconsistent outcomes.</p>
+        </div>
+      </div>
+
+      <div
+        style="margin-top: 30px; background: #f1f5f9; border-radius: 12px; padding: 20px 28px; display: flex; align-items: center; gap: 16px;">
+        <span style="font-size: 28px;">💡</span>
+        <div>
+          <strong style="font-size: 0.95rem;">Core Insight:</strong>
+          <span style="color: var(--muted); font-size: 0.9rem;">
+            We need an intelligent system that can automatically triage every stock movement, identify waste, suggest
+            optimal routes, and present actionable insights — without requiring manual SAP lookups.
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 3: Solution Overview                                                -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-dark section-header" id="slide-3">
+      <span class="section-number">01</span>
+      <div class="glow-circle" style="width:600px;height:600px;background:#6366f1;top:-200px;left:-200px;"></div>
+      <h2
+        style="background: linear-gradient(135deg, #fff 0%, #818cf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; max-width: 700px;">
+        An AI Brain<br>for Your Supply Chain
+      </h2>
+      <p class="lead" style="margin-bottom: 40px;">
+        SCNV deploys a team of specialised AI agents that work together — much like a real supply chain operations team
+        —
+        to analyse, classify, optimise, and report on every stock movement in real time.
+      </p>
+
+      <div class="pipeline">
+        <div class="pipeline-step">
+          <div class="step-icon">📥</div>
+          <h4>Event Arrives</h4>
+          <p>STO / Sales Order</p>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step">
+          <div class="step-icon">🧠</div>
+          <h4>AI Orchestrator</h4>
+          <p>Routes to right agent</p>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step">
+          <div class="step-icon">📊</div>
+          <h4>Analysis</h4>
+          <p>Rules + AI classify</p>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step">
+          <div class="step-icon">🔄</div>
+          <h4>Optimisation</h4>
+          <p>Find best route</p>
+        </div>
+        <div class="pipeline-arrow">→</div>
+        <div class="pipeline-step">
+          <div class="step-icon">✅</div>
+          <h4>Decision</h4>
+          <p>Approve / Escalate</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 4: The AI Agent Team                                                -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-light" id="slide-4">
+      <div class="content-header">
+        <div class="tag">Multi-Agent Architecture</div>
+        <h2>Meet the AI Agent Team</h2>
+      </div>
+
+      <div class="cards-grid cards-3" style="margin-bottom: 20px;">
+        <div class="card" style="border-left: 4px solid #6366f1;">
+          <div class="icon-circle" style="background:#eef2ff;color:#4f46e5;">🌐</div>
+          <h3>Orchestrator Agent</h3>
+          <p><strong>Role:</strong> The "Traffic Controller" — receives every incoming event and intelligently routes it
+            to the correct specialist agent based on event type.</p>
+          <div style="margin-top: 12px;">
+            <span class="badge badge-purple">Coordination</span>
+          </div>
+        </div>
+        <div class="card" style="border-left: 4px solid #8b5cf6;">
+          <div class="icon-circle" style="background:#f5f3ff;color:#7c3aed;">🔬</div>
+          <h3>SCM Analyst Agent</h3>
+          <p><strong>Role:</strong> The "Supply Chain Analyst" — applies a set of 4 business rules to classify every STO
+            as Productive or Unproductive, with root-cause analysis.</p>
+          <div style="margin-top: 12px;">
+            <span class="badge badge-purple">Classification</span>
+          </div>
+        </div>
+        <div class="card" style="border-left: 4px solid #06b6d4;">
+          <div class="icon-circle" style="background:#ecfeff;color:#0891b2;">⚡</div>
+          <h3>Optimizer Agent</h3>
+          <p><strong>Role:</strong> The "Logistics Planner" — when an STO is unproductive, it finds the best alternative
+            route, calculates cost savings, and recommends corrective action.</p>
+          <div style="margin-top: 12px;">
+            <span class="badge badge-blue">Optimisation</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="cards-grid cards-4" style="grid-template-columns: repeat(4, 1fr);">
+        <div class="card" style="border-left: 3px solid #10b981; padding: 20px;">
+          <h3 style="font-size: 0.9rem;">🧠 LLM Engine</h3>
+          <p style="font-size: 0.8rem;">AI fallback when rules are uncertain — uses GPT for complex edge cases.</p>
+        </div>
+        <div class="card" style="border-left: 3px solid #f59e0b; padding: 20px;">
+          <h3 style="font-size: 0.9rem;">📈 KPI Monitor</h3>
+          <p style="font-size: 0.8rem;">Aggregates country-level performance — productive volume, sub-optimal %.</p>
+        </div>
+        <div class="card" style="border-left: 3px solid #3b82f6; padding: 20px;">
+          <h3 style="font-size: 0.9rem;">🎯 Allocation Agent</h3>
+          <p style="font-size: 0.8rem;">Monitors Sales Orders to check if customers are served from the optimal plant.
+          </p>
+        </div>
+        <div class="card" style="border-left: 3px solid #ec4899; padding: 20px;">
+          <h3 style="font-size: 0.9rem;">⛏️ Process Mining</h3>
+          <p style="font-size: 0.8rem;">Celonis integration for compliance auditing and process conformance scoring.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 5: How STO Classification Works                                     -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-accent" id="slide-5">
+      <span class="section-number">02</span>
+      <div class="content-header-dark" style="margin-bottom: 30px;">
+        <div class="tag" style="color: #818cf8;">STO Classification Engine</div>
+        <h2>How We Identify Waste in the Network</h2>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <p style="color: rgba(255,255,255,0.6); margin-bottom: 24px; font-size: 0.95rem; line-height: 1.7;">
+            The SCM Analyst Agent applies 4 business rules to every incoming Stock Transfer Order.
+            Each rule checks the type of movement and determines whether it adds value or creates waste.
+          </p>
+
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+              <td style="padding: 14px 0;"><span class="badge badge-green"
+                  style="min-width: 28px; text-align: center;">R1</span></td>
+              <td style="padding: 14px 8px; color: white; font-weight: 600; font-size: 0.9rem;">Plant → DC</td>
+              <td style="padding: 14px 0; color: rgba(255,255,255,0.5); font-size: 0.85rem;">Checks if it follows a
+                strategic lane. If yes → Productive. If not → Sales Over Forecast.</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+              <td style="padding: 14px 0;"><span class="badge badge-red"
+                  style="min-width: 28px; text-align: center;">R2</span></td>
+              <td style="padding: 14px 8px; color: white; font-weight: 600; font-size: 0.9rem;">DC → DC</td>
+              <td style="padding: 14px 0; color: rgba(255,255,255,0.5); font-size: 0.85rem;">Lateral movement between
+                distribution centres — always Unproductive. Root cause: Incorrect Deployments.</td>
+            </tr>
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+              <td style="padding: 14px 0;"><span class="badge badge-red"
+                  style="min-width: 28px; text-align: center;">R3</span></td>
+              <td style="padding: 14px 8px; color: white; font-weight: 600; font-size: 0.9rem;">DC → Plant</td>
+              <td style="padding: 14px 0; color: rgba(255,255,255,0.5); font-size: 0.85rem;">Reverse movement — goods
+                flowing upstream. Always Unproductive. Root cause: Incorrect Deployments.</td>
+            </tr>
+            <tr>
+              <td style="padding: 14px 0;"><span class="badge badge-yellow"
+                  style="min-width: 28px; text-align: center;">R4</span></td>
+              <td style="padding: 14px 8px; color: white; font-weight: 600; font-size: 0.9rem;">Plant → Plant</td>
+              <td style="padding: 14px 0; color: rgba(255,255,255,0.5); font-size: 0.85rem;">Inter-plant. Classification
+                depends on sourcing model (Single vs Dual) and direction.</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="flow-diagram">
+          <div style="text-align: center; font-weight: 700; color: #c7d2fe; margin-bottom: 8px;">Decision Flow</div>
+          <div class="flow-node" style="width: 100%;">📦 New STO Arrives</div>
+          <div class="flow-arrow-down">↓</div>
+          <div class="flow-node" style="width: 100%;">🔍 Check Master Data (Source & Destination)</div>
+          <div class="flow-arrow-down">↓</div>
+          <div class="flow-row" style="justify-content: center;">
+            <div class="flow-node highlight">✅ Productive</div>
+            <span style="color: rgba(255,255,255,0.3);">or</span>
+            <div class="flow-node warning">⚠️ Unproductive</div>
+          </div>
+          <div class="flow-arrow-down">↓</div>
+          <div class="flow-node" style="width: 100%;">📋 Root Cause Assigned</div>
+          <div class="flow-arrow-down">↓</div>
+          <div class="flow-row" style="justify-content: center;">
+            <div class="flow-node" style="font-size: 0.75rem;">≥ 80% Confident?<br>→ Proceed</div>
+            <span style="color: rgba(255,255,255,0.3);">or</span>
+            <div class="flow-node"
+              style="font-size: 0.75rem; background: rgba(245,158,11,0.2); border-color: rgba(245,158,11,0.3); color: #fde68a;">
+              Low Confidence?<br>→ Escalate to AI</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 6: Intelligent Chat Assistant                                       -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-light" id="slide-6">
+      <div class="content-header">
+        <div class="tag">Intelligent Interface</div>
+        <h2>Conversational AI Chat — Your 24/7 Supply Chain Analyst</h2>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <p style="color: var(--muted); margin-bottom: 24px; font-size: 0.95rem; line-height: 1.7;">
+            Instead of navigating complex SAP screens, users simply ask questions in plain English.
+            The system intelligently understands the intent and routes the question to the right capability.
+          </p>
+
+          <ul class="feature-list feature-list-light">
+            <li>
+              <div class="li-icon">📊</div>
+              <div class="li-text">
+                <strong>"What is the allocation efficiency for UK?"</strong>
+                <span>Routes to KPI Engine → Aggregates data → Returns strategic analysis with charts.</span>
+              </div>
+            </li>
+            <li>
+              <div class="li-icon">📦</div>
+              <div class="li-text">
+                <strong>"Classify STO from DC_North to DC_East for 500 HL"</strong>
+                <span>Routes to Orchestrator → Runs Rules Engine → Returns classification with reasoning.</span>
+              </div>
+            </li>
+            <li>
+              <div class="li-icon">🗃️</div>
+              <div class="li-text">
+                <strong>"Show me customer KUNNR_045 orders"</strong>
+                <span>Routes to SAP Database → Executes natural-language SQL query → Returns live data.</span>
+              </div>
+            </li>
+            <li>
+              <div class="li-icon">📜</div>
+              <div class="li-text">
+                <strong>"Any similar past decisions for Belgium?"</strong>
+                <span>Routes to Historical Memory → Searches vector embeddings → Returns similar cases.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div
+          style="background: linear-gradient(135deg, #0F172A, #1E293B); border-radius: 16px; padding: 28px; color: white;">
+          <div style="font-weight: 700; margin-bottom: 16px; font-size: 0.9rem; color: #818cf8;">6 Intelligent Routes
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+              <span style="font-size: 0.85rem;">👋 Greeting</span>
+              <span style="font-size: 0.75rem; color: #818cf8;">Friendly welcome</span>
+            </div>
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(99,102,241,0.15); border-radius: 10px; border: 1px solid rgba(99,102,241,0.3);">
+              <span style="font-size: 0.85rem;">📊 KPI Query</span>
+              <span style="font-size: 0.75rem; color: #a5b4fc;">Analytics engine</span>
+            </div>
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+              <span style="font-size: 0.85rem;">📦 STO Analysis</span>
+              <span style="font-size: 0.75rem; color: #818cf8;">Multi-agent pipeline</span>
+            </div>
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+              <span style="font-size: 0.85rem;">🗄️ SAP Data</span>
+              <span style="font-size: 0.75rem; color: #818cf8;">NL-to-SQL engine</span>
+            </div>
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+              <span style="font-size: 0.85rem;">📜 Historical</span>
+              <span style="font-size: 0.75rem; color: #818cf8;">Vector search</span>
+            </div>
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255,255,255,0.05); border-radius: 10px;">
+              <span style="font-size: 0.85rem;">💬 Generic</span>
+              <span style="font-size: 0.75rem; color: #818cf8;">SC knowledge base</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 7: Dashboard & KPIs                                                 -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-light" id="slide-7">
+      <div class="content-header">
+        <div class="tag">Executive Dashboard</div>
+        <h2>Real-Time KPIs & Network Visibility</h2>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-value" style="color: #10b981;">78.3%</div>
+          <div class="kpi-label">Allocation Efficiency</div>
+          <div class="progress-bar-bg" style="background: #e2e8f0;">
+            <div class="progress-bar-fill" style="width: 78%; background: linear-gradient(90deg, #10b981, #06d6a0);">
+            </div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" style="color: #6366f1;">62.4%</div>
+          <div class="kpi-label">Optimal Allocation Ratio</div>
+          <div class="progress-bar-bg" style="background: #e2e8f0;">
+            <div class="progress-bar-fill" style="width: 62%; background: linear-gradient(90deg, #6366f1, #818cf8);">
+            </div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" style="color: #ef4444;">37.6%</div>
+          <div class="kpi-label">Sub-Optimal Customer %</div>
+          <div class="progress-bar-bg" style="background: #e2e8f0;">
+            <div class="progress-bar-fill" style="width: 37.6%; background: linear-gradient(90deg, #ef4444, #f87171);">
+            </div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value" style="color: #f59e0b;">45.2%</div>
+          <div class="kpi-label">Productive Transfer %</div>
+          <div class="progress-bar-bg" style="background: #e2e8f0;">
+            <div class="progress-bar-fill" style="width: 45.2%; background: linear-gradient(90deg, #f59e0b, #fbbf24);">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cards-grid cards-3">
+        <div class="card" style="grid-column: span 2;">
+          <h3 style="margin-bottom: 12px;">📈 Productive vs Unproductive Volume Trend</h3>
+          <p>Monthly bar chart showing the split between productive and unproductive transfer volumes across all
+            countries or filtered by a specific region. Helps identify seasonal patterns and persistent inefficiency
+            zones.</p>
+          <div style="margin-top: 16px; display: flex; gap: 16px; align-items: center;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="width:12px;height:12px;background:#10b981;border-radius:3px;"></div><span
+                style="font-size:0.8rem;color:var(--muted);">Productive</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="width:12px;height:12px;background:#ef4444;border-radius:3px;"></div><span
+                style="font-size:0.8rem;color:var(--muted);">Unproductive</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom: 12px;">🗺️ Network Visibility Map</h3>
+          <p>Interactive visual map powered by React Flow showing all Plants, Distribution Centres, and the strategic
+            lanes connecting them. Users can zoom, pan, and inspect individual nodes for operational details.</p>
+          <div style="margin-top: 12px;">
+            <span class="badge badge-green">Live from SAP Data</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 8: Data Foundation                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-accent" id="slide-8">
+      <span class="section-number">03</span>
+      <div class="content-header-dark" style="margin-bottom: 30px;">
+        <div class="tag">Data Foundation</div>
+        <h2>The Data That Powers SCNV</h2>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <p style="color: rgba(255,255,255,0.55); margin-bottom: 24px; font-size: 0.95rem; line-height: 1.7;">
+            SCNV relies on four key master data sets — the same data sources your SAP system holds today. These are
+            normalised and loaded into a cloud database for real-time querying.
+          </p>
+
+          <ul class="feature-list">
+            <li>
+              <div class="li-icon">🏭</div>
+              <div class="li-text">
+                <strong>Plant Master</strong>
+                <span>All manufacturing plants with country codes, regions, and sourcing capabilities — defining where
+                  products are made.</span>
+              </div>
+            </li>
+            <li>
+              <div class="li-icon">📦</div>
+              <div class="li-text">
+                <strong>DC Master (Distribution Centres)</strong>
+                <span>All warehouses and DCs with their capacity, geographic location, and downstream customer
+                  assignments.</span>
+              </div>
+            </li>
+            <li>
+              <div class="li-icon">🏷️</div>
+              <div class="li-text">
+                <strong>SKU Master</strong>
+                <span>Product catalogue with sourcing model (Single/Dual), shelf life, sourcing plants, and demand
+                  categorisation.</span>
+              </div>
+            </li>
+            <li>
+              <div class="li-icon">🛤️</div>
+              <div class="li-text">
+                <strong>Strategic Matrix</strong>
+                <span>Defines which Plant→DC lanes are "strategic" (approved corridors) and their current capacity
+                  utilisation.</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="card-dark" style="margin-bottom: 16px;">
+            <h3 style="margin-bottom: 12px;">🔄 Operational Data Streams</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div
+                style="display: flex; justify-content: space-between; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                <span style="font-size: 0.85rem;">Stock Transfer Orders (STOs)</span>
+                <span class="badge badge-blue">Real-time</span>
+              </div>
+              <div
+                style="display: flex; justify-content: space-between; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                <span style="font-size: 0.85rem;">Sales Orders (VBAK/VBAP)</span>
+                <span class="badge badge-blue">Real-time</span>
+              </div>
+              <div
+                style="display: flex; justify-content: space-between; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                <span style="font-size: 0.85rem;">Deliveries (LIKP/LIPS)</span>
+                <span class="badge badge-blue">Real-time</span>
+              </div>
+              <div
+                style="display: flex; justify-content: space-between; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                <span style="font-size: 0.85rem;">Customer Orders</span>
+                <span class="badge badge-green">Aggregated</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-dark">
+            <h3 style="margin-bottom: 12px;">🧠 Memory Layers</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div
+                style="display: flex; justify-content: space-between; padding: 10px 14px; background: rgba(16,185,129,0.1); border-radius: 8px; border: 1px solid rgba(16,185,129,0.2);">
+                <span style="font-size: 0.85rem;">Graph Database (Neo4j)</span>
+                <span style="font-size: 0.75rem; color: #a7f3d0;">Network relationships</span>
+              </div>
+              <div
+                style="display: flex; justify-content: space-between; padding: 10px 14px; background: rgba(99,102,241,0.1); border-radius: 8px; border: 1px solid rgba(99,102,241,0.2);">
+                <span style="font-size: 0.85rem;">Vector Embeddings (pgvector)</span>
+                <span style="font-size: 0.75rem; color: #c7d2fe;">Historical decisions</span>
+              </div>
+              <div
+                style="display: flex; justify-content: space-between; padding: 10px 14px; background: rgba(245,158,11,0.1); border-radius: 8px; border: 1px solid rgba(245,158,11,0.2);">
+                <span style="font-size: 0.85rem;">Cloud Database (Supabase)</span>
+                <span style="font-size: 0.75rem; color: #fde68a;">Transactional storage</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 9: Human-in-the-Loop                                                -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-light" id="slide-9">
+      <div class="content-header">
+        <div class="tag">Governance & Control</div>
+        <h2>Human-in-the-Loop Decision Making</h2>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <p style="color: var(--muted); margin-bottom: 24px; font-size: 0.95rem; line-height: 1.7;">
+            SCNV doesn't replace human judgement — it enhances it. Critical decisions are surfaced as alerts
+            that require human approval before execution, ensuring full control over supply chain operations.
+          </p>
+
+          <div class="card" style="margin-bottom: 16px; border-left: 4px solid #ef4444;">
+            <h3 style="font-size: 0.95rem;">🔔 STO Re-routing Alerts</h3>
+            <p>When an STO is classified as having a high-risk pattern (e.g., lead time violation, reverse flow), it is
+              flagged for human review. Managers can <strong>Approve</strong>, <strong>Reject</strong>, or
+              <strong>Override</strong> with a reason.</p>
+          </div>
+          <div class="card" style="border-left: 4px solid #f59e0b;">
+            <h3 style="font-size: 0.95rem;">🔔 SO Re-routing Decisions</h3>
+            <p>When a Sales Order is allocated to a sub-optimal plant, the system suggests re-routing to a better source
+              plant. The supply chain manager reviews the recommendation and decides.</p>
+          </div>
+        </div>
+
+        <div>
+          <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: 16px; padding: 24px;">
+            <h3 style="font-size: 0.95rem; margin-bottom: 16px; color: var(--text);">Example Alert: SO Re-routing</h3>
+            <table style="width: 100%; font-size: 0.82rem;">
+              <tr>
+                <td style="padding: 6px 0; color: var(--muted); width: 130px;">Order ID</td>
+                <td style="font-weight: 600;">SO-2026-0451</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: var(--muted);">Customer</td>
+                <td>CUST087</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: var(--muted);">Material</td>
+                <td>Decorative Paints - Premium</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: var(--muted);">Assigned Plant</td>
+                <td style="color: #ef4444; font-weight: 600;">7C53</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: var(--muted);">Optimal Plant</td>
+                <td style="color: #10b981; font-weight: 600;">DBAB ✓</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: var(--muted);">Country</td>
+                <td>Belgium (BE)</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: var(--muted);">Reason</td>
+                <td>Closer strategic plant available</td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: var(--muted);">Efficiency Score</td>
+                <td><span style="font-weight: 700; color: #f59e0b;">63%</span></td>
+              </tr>
+              <tr>
+                <td style="padding: 6px 0; color: var(--muted);">Escalation Timer</td>
+                <td>2h 15m remaining</td>
+              </tr>
+            </table>
+            <div style="display: flex; gap: 10px; margin-top: 18px;">
+              <div
+                style="flex:1;background:#dcfce7;color:#166534;text-align:center;padding:10px;border-radius:8px;font-weight:700;font-size:0.82rem;">
+                ✓ APPROVE RE-ROUTE</div>
+              <div
+                style="flex:1;background:#fee2e2;color:#991b1b;text-align:center;padding:10px;border-radius:8px;font-weight:700;font-size:0.82rem;">
+                ✕ REJECT</div>
+              <div
+                style="flex:1;background:#fef3c7;color:#92400e;text-align:center;padding:10px;border-radius:8px;font-weight:700;font-size:0.82rem;">
+                ⚙ OVERRIDE</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 10: Network Graph Memory & Process Mining                           -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-dark" id="slide-10">
+      <span class="section-number">04</span>
+      <div class="content-header-dark" style="margin-bottom: 30px;">
+        <div class="tag">Advanced Capabilities</div>
+        <h2>Graph Memory & Process Mining</h2>
+      </div>
+
+      <div class="cards-grid cards-2">
+        <div class="card-dark" style="border: 1px solid rgba(16,185,129,0.2);">
+          <div class="icon-circle" style="background:rgba(16,185,129,0.15);font-size:28px;">🕸️</div>
+          <h3>Graph Database Memory (Neo4j)</h3>
+          <p style="margin-bottom: 16px;">Maps the entire supply chain as a graph of interconnected nodes — Plants, DCs,
+            SKUs, and the routes between them — enabling the system to:</p>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;">
+            <li style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+              <span style="color:#10b981;">✓</span> Find alternative sourcing DCs when stock is available elsewhere
+            </li>
+            <li style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+              <span style="color:#10b981;">✓</span> Understand upstream/downstream impact of routing changes
+            </li>
+            <li style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+              <span style="color:#10b981;">✓</span> Provide contextual data to AI agents for smarter decisions
+            </li>
+            <li style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+              <span style="color:#10b981;">✓</span> Preserve network topology knowledge across sessions
+            </li>
+          </ul>
+        </div>
+
+        <div class="card-dark" style="border: 1px solid rgba(99,102,241,0.2);">
+          <div class="icon-circle" style="background:rgba(99,102,241,0.15);font-size:28px;">⛏️</div>
+          <h3>Process Mining (Celonis EMS)</h3>
+          <p style="margin-bottom: 16px;">Connects to Celonis to validate AI decisions against real process execution
+            data — ensuring compliant and conformant operations:</p>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;">
+            <li style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+              <span style="color:#818cf8;">✓</span> Conformance scoring — how well does actual execution match designed
+              flows?
+            </li>
+            <li style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+              <span style="color:#818cf8;">✓</span> Lane efficiency — identifying consistently underperforming routes
+            </li>
+            <li style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+              <span style="color:#818cf8;">✓</span> Variant pattern analysis — detecting deviation from standard
+              processes
+            </li>
+            <li style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:rgba(255,255,255,0.7);">
+              <span style="color:#818cf8;">✓</span> Toggle on/off from the dashboard (Celonis EMS toggle)
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 11: Security & Authentication                                       -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-light" id="slide-11">
+      <div class="content-header">
+        <div class="tag">Security & Access Control</div>
+        <h2>Enterprise-Grade Security</h2>
+      </div>
+
+      <div class="cards-grid cards-3" style="margin-bottom: 28px;">
+        <div class="card" style="border-top: 3px solid #6366f1;">
+          <div class="icon-circle" style="background:#eef2ff;color:#4f46e5;">🔐</div>
+          <h3>Supabase Authentication</h3>
+          <p>All users authenticate through Supabase (industry-standard JWT tokens). Every API request is verified
+            before data is served — no anonymous access.</p>
+        </div>
+        <div class="card" style="border-top: 3px solid #10b981;">
+          <div class="icon-circle" style="background:#d1fae5;color:#059669;">👥</div>
+          <h3>Role-Based Access Control</h3>
+          <p>Admin users can upload data and manage configurations. Standard users interact with the chatbot and view
+            dashboards. Roles are enforced at both frontend and backend.</p>
+        </div>
+        <div class="card" style="border-top: 3px solid #f59e0b;">
+          <div class="icon-circle" style="background:#fef3c7;color:#d97706;">🛡️</div>
+          <h3>Row-Level Security (RLS)</h3>
+          <p>Database-level policies ensure users can only access data they are authorised to see. Even if a query is
+            crafted manually, RLS prevents unauthorised data exposure.</p>
+        </div>
+      </div>
+
+      <div
+        style="background: #f1f5f9; border-radius: 12px; padding: 24px; display: flex; gap: 40px; align-items: center;">
+        <div style="flex: 1;">
+          <h3 style="font-size: 1rem; margin-bottom: 8px;">Document Upload & Knowledge Ingestion</h3>
+          <p style="font-size: 0.88rem; color: var(--muted); line-height: 1.6;">
+            Authorised admins can upload supply chain documents (Excel, Word, CSV, JSON) which are parsed and embedded
+            into the system's memory. This enriches the AI's context without manual data entry. Uploaded files are
+            previewed
+            in-app before ingestion.
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <span class="badge badge-blue" style="padding: 6px 14px; font-size: 0.82rem;">.xlsx</span>
+          <span class="badge badge-purple" style="padding: 6px 14px; font-size: 0.82rem;">.docx</span>
+          <span class="badge badge-green" style="padding: 6px 14px; font-size: 0.82rem;">.csv</span>
+          <span class="badge badge-yellow" style="padding: 6px 14px; font-size: 0.82rem;">.json</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 12: Roadmap & Future Vision                                         -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-accent" id="slide-12">
+      <span class="section-number">05</span>
+      <div class="content-header-dark" style="margin-bottom: 30px;">
+        <div class="tag">Strategic Roadmap</div>
+        <h2>Where We Are & Where We're Going</h2>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+        <div class="card-dark" style="border-top: 3px solid #10b981; padding: 22px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 0.75rem; font-weight: 700; color: #10b981;">PHASE 1-4</span>
+            <span class="badge badge-green">COMPLETED</span>
+          </div>
+          <h3 style="font-size: 0.95rem; margin-bottom: 10px;">Foundation Build</h3>
+          <ul
+            style="list-style: none; font-size: 0.8rem; color: rgba(255,255,255,0.5); display: flex; flex-direction: column; gap: 6px;">
+            <li>✓ Multi-agent framework</li>
+            <li>✓ Rules engine (4 rules)</li>
+            <li>✓ REST API backend</li>
+            <li>✓ React dashboard</li>
+            <li>✓ Supabase integration</li>
+            <li>✓ STO classification</li>
+          </ul>
+        </div>
+
+        <div class="card-dark" style="border-top: 3px solid #6366f1; padding: 22px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 0.75rem; font-weight: 700; color: #818cf8;">PHASE 5</span>
+            <span class="badge badge-green">COMPLETED</span>
+          </div>
+          <h3 style="font-size: 0.95rem; margin-bottom: 10px;">Advanced Intelligence</h3>
+          <ul
+            style="list-style: none; font-size: 0.8rem; color: rgba(255,255,255,0.5); display: flex; flex-direction: column; gap: 6px;">
+            <li>✓ Neo4j graph memory</li>
+            <li>✓ Celonis dashboard toggle</li>
+            <li>✓ KPI analytics engine</li>
+            <li>✓ Vector embeddings</li>
+            <li>✓ Historical memory search</li>
+            <li>✓ NL-to-SQL querying</li>
+          </ul>
+        </div>
+
+        <div class="card-dark" style="border-top: 3px solid #f59e0b; padding: 22px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 0.75rem; font-weight: 700; color: #fbbf24;">PHASE 6</span>
+            <span class="badge badge-yellow">IN PROGRESS</span>
+          </div>
+          <h3 style="font-size: 0.95rem; margin-bottom: 10px;">Shadow Mode</h3>
+          <ul
+            style="list-style: none; font-size: 0.8rem; color: rgba(255,255,255,0.5); display: flex; flex-direction: column; gap: 6px;">
+            <li>○ Shadow mode deployment</li>
+            <li>○ Dockerisation</li>
+            <li>○ CI/CD pipeline</li>
+            <li>○ Performance testing</li>
+            <li>○ User acceptance testing</li>
+            <li>○ Security audit</li>
+          </ul>
+        </div>
+
+        <div class="card-dark" style="border-top: 3px solid #06b6d4; padding: 22px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 0.75rem; font-weight: 700; color: #22d3ee;">PHASE 7</span>
+            <span class="badge badge-blue">PLANNED</span>
+          </div>
+          <h3 style="font-size: 0.95rem; margin-bottom: 10px;">Production Go-Live</h3>
+          <ul
+            style="list-style: none; font-size: 0.8rem; color: rgba(255,255,255,0.5); display: flex; flex-direction: column; gap: 6px;">
+            <li>○ Live SAP integration</li>
+            <li>○ Full SAP webhook</li>
+            <li>○ Multi-region rollout</li>
+            <li>○ Predictive analytics</li>
+            <li>○ CO₂ footprint tracking</li>
+            <li>○ Mobile app support</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <!-- SLIDE 13: Closing / Thank You                                             -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+    <div class="slide slide-gradient title-slide" id="slide-13">
+      <div class="glow-circle" style="width:600px;height:600px;background:#06b6d4;top:-200px;left:-200px;"></div>
+      <div class="glow-circle" style="width:500px;height:500px;background:#6366f1;bottom:-150px;right:-100px;"></div>
+      <div class="logo-badge">OFI SERVICES</div>
+      <h1 style="font-size: 3rem;">Thank You</h1>
+      <p class="subtitle" style="margin-bottom: 40px;">
+        SCNV is transforming supply chain operations from reactive to proactive — delivering real-time visibility,
+        intelligent automation, and measurable cost savings across the global distribution network.
+      </p>
+
+      <div style="display: flex; gap: 24px; flex-wrap: wrap; justify-content: center;">
+        <div
+          style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 14px; padding: 20px 30px; text-align: center; backdrop-filter: blur(10px);">
+          <div style="font-size: 2rem; font-weight: 900; color: white;">7</div>
+          <div
+            style="font-size: 0.75rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px;">AI
+            Agents</div>
+        </div>
+        <div
+          style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 14px; padding: 20px 30px; text-align: center; backdrop-filter: blur(10px);">
+          <div style="font-size: 2rem; font-weight: 900; color: white;">4</div>
+          <div
+            style="font-size: 0.75rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px;">
+            Business Rules</div>
+        </div>
+        <div
+          style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 14px; padding: 20px 30px; text-align: center; backdrop-filter: blur(10px);">
+          <div style="font-size: 2rem; font-weight: 900; color: white;">6</div>
+          <div
+            style="font-size: 0.75rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px;">
+            Chat Routes</div>
+        </div>
+        <div
+          style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 14px; padding: 20px 30px; text-align: center; backdrop-filter: blur(10px);">
+          <div style="font-size: 2rem; font-weight: 900; color: white;">3</div>
+          <div
+            style="font-size: 0.75rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px;">
+            Memory Layers</div>
+        </div>
+        <div
+          style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 14px; padding: 20px 30px; text-align: center; backdrop-filter: blur(10px);">
+          <div style="font-size: 2rem; font-weight: 900; color: white;">24/7</div>
+          <div
+            style="font-size: 0.75rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px;">
+            Always On</div>
+        </div>
+      </div>
+
+      <p class="meta" style="margin-top: 50px;">QUESTIONS &nbsp;•&nbsp; FEEDBACK &nbsp;•&nbsp; NEXT STEPS</p>
+    </div>
+
+  </div><!-- end slide-container -->
+
+  <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+  <!-- NAVIGATION                                                                -->
+  <!-- ═══════════════════════════════════════════════════════════════════════════ -->
+  <div class="nav-controls">
+    <div class="slide-counter"><span id="current-slide">1</span> / 13</div>
+    <button class="nav-btn" onclick="changeSlide(-1)">‹</button>
+    <button class="nav-btn" onclick="changeSlide(1)">›</button>
+  </div>
+
+  <script>
+    let current = 1;
+    const total = 13;
+
+    function changeSlide(direction) {
+      const next = current + direction;
+      if (next < 1 || next > total) return;
+
+      document.getElementById('slide-' + current).classList.remove('active');
+      current = next;
+      document.getElementById('slide-' + current).classList.add('active');
+      document.getElementById('current-slide').textContent = current;
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+        e.preventDefault();
+        changeSlide(1);
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        changeSlide(-1);
+      }
+    });
+  </script>
+
+</body>
+
+</html>

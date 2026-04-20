@@ -1,0 +1,12 @@
+/* ── Import app styles first ── */
+@import './styles/globals.css';
+@import './styles/components.css';
+@import './styles/auth.css';
+@import './styles/sidebar.css';
+@import './styles/chat.css';
+@import './styles/topheader.css';
+
+/* ── Tailwind utilities ── */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
