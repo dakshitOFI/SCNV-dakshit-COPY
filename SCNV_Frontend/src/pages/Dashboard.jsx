@@ -107,50 +107,53 @@ function DashboardPage({ sidebarCollapsed, setSidebarCollapsed, setSelectedAgent
 
       <div className="fc-page__body">
         <main className="fc-page__main">
-          {/* Page Title */}
-          <div className="fc-page-title">
-            <h1>Supply Chain Dashboard</h1>
-            <p>Overview of your automated supply chain network visibility and agent activity.</p>
-          </div>
+          {/* Page Title + Controls Row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+            {/* Left: Title */}
+            <div className="fc-page-title" style={{ marginBottom: 0 }}>
+              <h1>Supply Chain Dashboard</h1>
+              <p>Overview of your automated supply chain network visibility and agent activity.</p>
+            </div>
 
-          {/* Controls row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-            <CountrySelector
-              selectedCountry={selectedCountry}
-              onCountryChange={setSelectedCountry}
-            />
+            {/* Right: Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
+              <CountrySelector
+                selectedCountry={selectedCountry}
+                onCountryChange={setSelectedCountry}
+              />
 
-            {/* Celonis Toggle */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '1rem',
-              background: 'white', padding: '0.75rem 1.5rem',
-              borderRadius: '2rem', border: '1px solid var(--color-border)',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.06)'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--color-text)' }}>Celonis EMS</span>
-                <span style={{ fontSize: '0.75rem', color: isCelonisEnabled ? '#10b981' : 'var(--color-muted)' }}>
-                  {isCelonisEnabled ? 'Active (Intercepting)' : 'Disabled'}
-                </span>
+              {/* Celonis Toggle */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '1rem',
+                background: 'white', padding: '0.75rem 1.5rem',
+                borderRadius: '2rem', border: '1px solid var(--color-border)',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.06)'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--color-text)' }}>Celonis EMS</span>
+                  <span style={{ fontSize: '0.75rem', color: isCelonisEnabled ? '#10b981' : 'var(--color-muted)' }}>
+                    {isCelonisEnabled ? 'Active (Intercepting)' : 'Disabled'}
+                  </span>
+                </div>
+                <button
+                  onClick={toggleCelonis}
+                  style={{
+                    width: '44px', height: '24px',
+                    background: isCelonisEnabled ? '#10b981' : '#e5e7eb',
+                    borderRadius: '12px', position: 'relative',
+                    border: 'none', cursor: 'pointer',
+                    transition: 'background 0.3s ease'
+                  }}
+                >
+                  <div style={{
+                    width: '20px', height: '20px', background: 'white',
+                    borderRadius: '50%', position: 'absolute', top: '2px',
+                    left: isCelonisEnabled ? '22px' : '2px',
+                    transition: 'left 0.3s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                  }} />
+                </button>
               </div>
-              <button
-                onClick={toggleCelonis}
-                style={{
-                  width: '44px', height: '24px',
-                  background: isCelonisEnabled ? '#10b981' : '#e5e7eb',
-                  borderRadius: '12px', position: 'relative',
-                  border: 'none', cursor: 'pointer',
-                  transition: 'background 0.3s ease'
-                }}
-              >
-                <div style={{
-                  width: '20px', height: '20px', background: 'white',
-                  borderRadius: '50%', position: 'absolute', top: '2px',
-                  left: isCelonisEnabled ? '22px' : '2px',
-                  transition: 'left 0.3s ease',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                }} />
-              </button>
             </div>
           </div>
 
