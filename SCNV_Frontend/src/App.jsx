@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthPage from './pages/Auth';
+import ResetPasswordPage from './pages/ResetPassword';
 import ChatPage from './pages/Chat';
 import DashboardPage from './pages/Dashboard';
 import DecisionsPage from './pages/Decisions';
@@ -10,6 +11,18 @@ import { AGENTS } from './config/agents.jsx';
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
   if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.ROLE);
+      localStorage.removeItem(STORAGE_KEYS.EMAIL);
+      return <Navigate to="/login" replace />;
+    }
+  } catch {
+    localStorage.removeItem(STORAGE_KEYS.TOKEN);
     return <Navigate to="/login" replace />;
   }
   return children;
@@ -44,6 +57,7 @@ function App() {
           </PublicRoute>
         }
       />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/dashboard"
         element={

@@ -7,6 +7,20 @@ function getAuthHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Redirect to login and clear stored credentials on 401
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
+      localStorage.removeItem(STORAGE_KEYS.ROLE);
+      localStorage.removeItem(STORAGE_KEYS.EMAIL);
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 /**
  * Register a new user using Supabase Auth.
  * @param {{ email: string, password: string, role: string }} payload
@@ -38,6 +52,26 @@ export async function login({ email, password }) {
     access_token: data.session.access_token,
     role: data.user.user_metadata?.role || 'User'
   };
+}
+
+/**
+ * Send a password reset email via Supabase Auth.
+ * @param {string} email
+ */
+export async function forgotPassword(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+  if (error) throw error;
+}
+
+/**
+ * Update the authenticated user's password (called after email link redirect).
+ * @param {string} newPassword
+ */
+export async function resetPassword(newPassword) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
 }
 
 export async function fetchSessions(agentId = null) {
@@ -79,11 +113,11 @@ export async function loadSession(sessionId) {
 export async function saveSession({ sessionId, messages, agentId }) {
   await axios.post(
     `${API_URL}/api/history/sessions/new`,
-    { 
-      session_id: sessionId, 
-      messages, 
+    {
+      session_id: sessionId,
+      messages,
       title: messages[0]?.content?.substring(0, 30) || 'New Chat',
-      agent_id: agentId 
+      agent_id: agentId
     },
     { headers: getAuthHeaders() },
   );
@@ -95,10 +129,10 @@ export async function saveSession({ sessionId, messages, agentId }) {
  * @returns {{ answer: string, sources: Array }}
  */
 export async function sendMessage(message, sessionId, agentId) {
-  const res = await axios.post(`${API_URL}/api/chat/`, { 
-    message, 
+  const res = await axios.post(`${API_URL}/api/chat/`, {
+    message,
     session_id: sessionId,
-    agent_id: agentId 
+    agent_id: agentId
   }, {
     headers: getAuthHeaders(),
   });

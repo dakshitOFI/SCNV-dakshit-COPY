@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { register, login } from '../api/api';
+import { register, login, forgotPassword } from '../api/api';
 import { STORAGE_KEYS } from '../config/constants';
 import Antigravity from '../components/Antigravity';
-import OfiLogo from '../components/OfiLogo';
 import '../styles/auth.css';
 import '../styles/components.css';
 
@@ -22,6 +21,9 @@ function AuthPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [isForgot, setIsForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,6 +55,33 @@ function AuthPage() {
     setError('');
   };
 
+  const openForgot = () => {
+    setForgotEmail(email);
+    setForgotSuccess(false);
+    setError('');
+    setIsForgot(true);
+  };
+
+  const closeForgot = () => {
+    setError('');
+    setForgotSuccess(false);
+    setIsForgot(false);
+  };
+
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await forgotPassword(forgotEmail);
+      setForgotSuccess(true);
+    } catch (err) {
+      setError(err.message || 'Failed to send reset email. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="auth-page">
       {/* ── Left branding panel ── */}
@@ -81,15 +110,9 @@ function AuthPage() {
         <div className="auth-panel__content">
           {/* Logo */}
           <div className="auth-brand">
-            <div style={{
-              background: 'rgba(255,255,255,0.92)',
-              borderRadius: '16px',
-              padding: '10px 18px',
-              display: 'inline-flex',
-              marginBottom: '20px',
-              backdropFilter: 'blur(8px)',
-            }}>
-              <OfiLogo size="default" showTagline={true} />
+            <div className="auth-brand__logo">
+              <span className="auth-brand__name">OFI</span>
+              <span className="auth-brand__name">Services</span>
             </div>
             <div className="auth-brand__subtitle">Supply Chain Network Visibility</div>
           </div>
@@ -118,97 +141,154 @@ function AuthPage() {
       {/* ── Right form panel ── */}
       <div className="auth-form-panel">
         <div className="auth-card">
-          {/* Header with logo */}
-          <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
-            <OfiLogo size="default" showTagline={true} />
-          </div>
-          <h2 className="auth-card__title">
-            {isLogin ? 'Welcome back' : 'Create account'}
-          </h2>
-          <p className="auth-card__subtitle">
-            {isLogin
-              ? 'Access your supply chain intelligence dashboard'
-              : 'Join the SCNV platform for supply chain optimization'}
-          </p>
 
-          {/* Form */}
-          <form className="auth-form" onSubmit={handleSubmit}>
-            {/* Email */}
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <input
-                type="email"
-                required
-                className="form-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
-              />
-            </div>
+          {isForgot ? (
+            /* ── Forgot password view ── */
+            <>
+              <button type="button" className="auth-back-link" onClick={closeForgot}>
+                ← Back to sign in
+              </button>
+              <h2 className="auth-card__title">Reset password</h2>
+              <p className="auth-card__subtitle">
+                Enter your email and we'll send you a link to reset your password.
+              </p>
 
-            {/* Password */}
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <div className="auth-pw-wrapper">
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  required
-                  className="form-input"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  style={{ paddingRight: '48px' }}
-                />
-                <button
-                  type="button"
-                  className="auth-pw-toggle"
-                  onClick={() => setShowPass((p) => !p)}
-                  aria-label={showPass ? 'Hide password' : 'Show password'}
-                >
-                  {showPass ? '🙈' : '👁️'}
+              {forgotSuccess ? (
+                <div className="auth-success">
+                  <span className="auth-success__icon">✓</span>
+                  <div>
+                    <strong>Check your inbox</strong>
+                    <p>A password reset link has been sent to <strong>{forgotEmail}</strong>. Check your spam folder if you don't see it.</p>
+                  </div>
+                </div>
+              ) : (
+                <form className="auth-form" onSubmit={handleForgotSubmit}>
+                  <div className="form-group">
+                    <label className="form-label">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      className="form-input"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="name@akzonobel.com"
+                    />
+                  </div>
+
+                  {error && <div className="alert-error">⚠️ {error}</div>}
+
+                  <button type="submit" className="auth-submit" disabled={loading}>
+                    {loading ? 'Sending...' : 'Send Reset Link'}
+                  </button>
+                </form>
+              )}
+
+              <p className="auth-footer">
+                Secured AI-powered supply chain platform<br />
+                © 2025 OFI Services SCNV. All rights reserved.
+              </p>
+            </>
+          ) : (
+            /* ── Login / Register view ── */
+            <>
+              {/* Header */}
+              <h2 className="auth-card__title">
+                {isLogin ? 'Welcome back' : 'Create account'}
+              </h2>
+              <p className="auth-card__subtitle">
+                {isLogin
+                  ? 'Access your supply chain intelligence dashboard'
+                  : 'Join the SCNV platform for supply chain optimization'}
+              </p>
+
+              {/* Form */}
+              <form className="auth-form" onSubmit={handleSubmit}>
+                {/* Email */}
+                <div className="form-group">
+                  <label className="form-label">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    className="form-input"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@akzonobel.com"
+                  />
+                </div>
+
+                {/* Password */}
+                <div className="form-group">
+                  <div className="auth-pw-label-row">
+                    <label className="form-label">Password</label>
+                    {isLogin && (
+                      <button type="button" className="auth-forgot-link" onClick={openForgot}>
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="auth-pw-wrapper">
+                    <input
+                      type={showPass ? 'text' : 'password'}
+                      required
+                      className="form-input"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      style={{ paddingRight: '48px' }}
+                    />
+                    <button
+                      type="button"
+                      className="auth-pw-toggle"
+                      onClick={() => setShowPass((p) => !p)}
+                      aria-label={showPass ? 'Hide password' : 'Show password'}
+                    >
+                      {showPass ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Role (signup only) */}
+                {!isLogin && (
+                  <div className="form-group">
+                    <label className="form-label">Role</label>
+                    <select
+                      className="form-input"
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                    >
+                      <option value="User">👤 Analyst – Query &amp; Monitor</option>
+                      <option value="Admin">🔑 Admin – Configure &amp; Manage</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Error */}
+                {error && <div className="alert-error">⚠️ {error}</div>}
+
+                {/* Submit */}
+                <button type="submit" className="auth-submit" disabled={loading}>
+                  {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
                 </button>
+              </form>
+
+              {/* Divider */}
+              <div className="divider">
+                {isLogin ? 'New to SCNV?' : 'Have an account?'}
               </div>
-            </div>
 
-            {/* Role (signup only) */}
-            {!isLogin && (
-              <div className="form-group">
-                <label className="form-label">Role</label>
-                <select
-                  className="form-input"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                >
-                  <option value="User">👤 Analyst – Query &amp; Monitor</option>
-                  <option value="Admin">🔑 Admin – Configure &amp; Manage</option>
-                </select>
-              </div>
-            )}
+              {/* Switch mode */}
+              <button className="auth-switch" onClick={switchMode}>
+                {isLogin ? 'Create new account' : 'Sign in instead'}
+              </button>
 
-            {/* Error */}
-            {error && <div className="alert-error">⚠️ {error}</div>}
+              {/* Footer */}
+              <p className="auth-footer">
+                Secured AI-powered supply chain platform<br />
+                © 2025 OFI Services SCNV. All rights reserved.
+              </p>
+            </>
+          )}
 
-            {/* Submit */}
-            <button type="submit" className="auth-submit" disabled={loading}>
-              {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Create Account'}
-            </button>
-          </form>
-
-          {/* Divider */}
-          <div className="divider">
-            {isLogin ? 'New to SCNV?' : 'Have an account?'}
-          </div>
-
-          {/* Switch mode */}
-          <button className="auth-switch" onClick={switchMode}>
-            {isLogin ? 'Create new account' : 'Sign in instead'}
-          </button>
-
-          {/* Footer */}
-          <p className="auth-footer">
-            Secured AI-powered supply chain platform<br />
-            © 2025 OFI Services SCNV. All rights reserved.
-          </p>
         </div>
       </div>
     </div>

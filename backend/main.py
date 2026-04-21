@@ -5,6 +5,8 @@ from typing import Dict, Any, List
 import sys
 import os
 
+app = FastAPI()
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "agents"))
 from scm_analyst import STOClassifier
 

@@ -12,27 +12,52 @@ def get_supabase_jwks_url():
     url = os.getenv("SUPABASE_URL", "https://nvdoiirgulzoncuecwdy.supabase.co")
     return f"{url}/auth/v1/.well-known/jwks.json"
 
-def verify_supabase_jwt(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)):
+def verify_supabase_jwt(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security)
+):
     """
-    Dependency that intercepts the Authorization Bearer token from the frontend.
-    For local development, if no token is provided, returns a guest user.
+    Dependency that verifies the Supabase JWT from the Authorization Bearer header.
+    Raises HTTP 401 if the token is missing, expired, or has an invalid signature.
     """
-    if not credentials or credentials.credentials in ["null", "undefined", ""]:
-        return {"sub": "guest-user-id", "email": "guest@example.com", "user_metadata": {"role": "User"}}
+
+    # Validate presence of credentials and token
+    if (
+        not credentials
+        or not credentials.credentials
+        or credentials.credentials in ["null", "undefined", ""]
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization token required"
+        )
 
     token = credentials.credentials
-    
+
     try:
-        # Decode the JWT without strictly verifying the symmetric signature for development
+        # Fetch JWKS (JSON Web Key Set) from Supabase
+        jwks_client = PyJWKClient(get_supabase_jwks_url())
+
+        # Retrieve the signing key from the JWT
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+
+        # Decode and verify the JWT
         data = jwt.decode(
             token,
-            options={
-                "verify_signature": False, 
-                "verify_aud": False,
-                "verify_exp": True
-            }
+            signing_key.key,
+            algorithms=["RS256"],
+            options={"verify_aud": False}
         )
+
         return data
-    except Exception as e:
-        # In case of expired token, still return guest for local testing ease
-        return {"sub": "guest-user-id", "email": "guest@example.com", "user_metadata": {"role": "User"}}
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401,
+            detail="Token has expired"
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authorization token"
+        )
