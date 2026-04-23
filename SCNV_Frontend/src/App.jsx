@@ -4,6 +4,7 @@ import AuthPage from './pages/Auth';
 import ChatPage from './pages/Chat';
 import DashboardPage from './pages/Dashboard';
 import DecisionsPage from './pages/Decisions';
+import NetworkMapPage from './pages/NetworkMap';
 import { STORAGE_KEYS } from './config/constants';
 import { AGENTS } from './config/agents.jsx';
 
@@ -78,6 +79,14 @@ function App() {
               setSidebarCollapsed={setSidebarCollapsed}
               setSelectedAgent={setSelectedAgent}
             />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/network-map"
+        element={
+          <ProtectedRoute>
+            <NetworkMapPage />
           </ProtectedRoute>
         }
       />

@@ -7,7 +7,8 @@ import AllocationEfficiencyCard from '../components/AllocationEfficiencyCard';
 import ProductiveTrendChart from '../components/ProductiveTrendChart';
 import SuboptimalCustomerTile from '../components/SuboptimalCustomerTile';
 import { STORAGE_KEYS, API_URL } from '../config/constants';
-import { Maximize2, X, Activity } from 'lucide-react';
+import { Maximize2, X, Activity, Globe2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import PlantNode from '../components/PlantNode';
 import DCNode from '../components/DCNode';
 import '../styles/topheader.css';
@@ -15,6 +16,7 @@ import '../styles/dashboard.css';
 import StarBorder from '../components/StarBorder';
 
 function DashboardPage({ sidebarCollapsed, setSidebarCollapsed, setSelectedAgent }) {
+  const navigate = useNavigate();
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -175,32 +177,68 @@ function DashboardPage({ sidebarCollapsed, setSidebarCollapsed, setSelectedAgent
             </StarBorder>
           </div>
 
-          {/* Network Visibility Map */}
+          {/* Network Visibility Map CTA */}
           <section style={{
-            background: 'white', padding: '1.25rem',
-            borderRadius: '1rem', border: '1px solid var(--color-border)',
-            display: 'flex', flexDirection: 'column',
-            position: 'relative', marginBottom: '2rem',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--color-text)' }}>Network Visibility Map</h2>
-              <button
-                onClick={() => setIsMapModalOpen(true)}
-                style={{
-                  background: 'var(--color-subtle)', border: 'none',
-                  borderRadius: '6px', padding: '6px 12px', cursor: 'pointer',
-                  color: 'var(--color-primary)', display: 'flex',
-                  alignItems: 'center', gap: '0.5rem',
-                  fontSize: '0.75rem', fontWeight: '600'
-                }}
-                title="Maximize Map"
-              >
-                <Maximize2 size={14} /> Maximize
-              </button>
+            background: 'linear-gradient(135deg, #0b0e13 0%, #131820 50%, #0f1a2e 100%)',
+            padding: '2rem',
+            borderRadius: '1rem',
+            border: '1px solid rgba(29, 184, 255, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            position: 'relative',
+            marginBottom: '2rem',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+            cursor: 'pointer',
+            overflow: 'hidden',
+            transition: 'all 0.3s ease'
+          }}
+            onClick={() => navigate('/network-map')}
+            onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(245, 166, 35, 0.4)'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(29, 184, 255, 0.15)'}
+          >
+            {/* Decorative glow */}
+            <div style={{
+              position: 'absolute', top: '-50%', right: '-10%',
+              width: '300px', height: '300px',
+              background: 'radial-gradient(circle, rgba(29,184,255,0.08) 0%, transparent 70%)',
+              pointerEvents: 'none'
+            }} />
+            <div style={{
+              position: 'absolute', bottom: '-50%', left: '20%',
+              width: '200px', height: '200px',
+              background: 'radial-gradient(circle, rgba(245,166,35,0.06) 0%, transparent 70%)',
+              pointerEvents: 'none'
+            }} />
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', zIndex: 1 }}>
+              <div style={{
+                width: '56px', height: '56px', borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(29,184,255,0.15), rgba(245,166,35,0.15))',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid rgba(29,184,255,0.2)'
+              }}>
+                <Globe2 size={28} color="#1db8ff" />
+              </div>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#e2e8f0', marginBottom: '0.25rem' }}>
+                  Network Visibility Map
+                </h2>
+                <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>
+                  Interactive D3.js force-directed graph · 295 nodes · 897 flows · Milk intake, STO transfers & sales deliveries
+                </p>
+              </div>
             </div>
-            <div style={{ height: '680px', width: '100%', borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
-              {mapContent}
+
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.75rem', zIndex: 1,
+              padding: '0.625rem 1.25rem', borderRadius: '8px',
+              background: 'linear-gradient(135deg, #f5a623, #e8431f)',
+              color: '#000', fontWeight: '700', fontSize: '0.875rem',
+              boxShadow: '0 4px 16px rgba(245, 166, 35, 0.3)',
+              whiteSpace: 'nowrap'
+            }}>
+              <Maximize2 size={16} /> Open Full Map
             </div>
           </section>
 

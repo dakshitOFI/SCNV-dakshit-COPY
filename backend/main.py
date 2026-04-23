@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", "agents"))
 from scm_analyst import STOClassifier
 
 # Import new API Routers
-from api.routes import admin, chat, alerts, documents, network, kpi
+from api.routes import admin, chat, alerts, documents, network, kpi, network_map
 from auth_deps import verify_supabase_jwt
 
 # Database setup (Only used by agents/other models now; User model removed as Supabase handles auth)
@@ -19,7 +19,10 @@ from database import engine, Base
 from models.sap_so_tables import VBAK, VBAP, LIKP, LIPS  # noqa: F401
 
 # Create all tables in the database (EXCEPT users, which Supabase handles)
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as _db_err:
+    print(f"Warning: Could not create DB tables (DB may be unavailable): {_db_err}")
 
 app = FastAPI(title="SCNV Agent API", description="Supply Chain Network Visibility Multi-Agent Backend")
 
@@ -40,6 +43,7 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["Human-in-the-loop
 app.include_router(documents.router, prefix="/api/documents", tags=["Knowledge Base Ingestion"], dependencies=[Depends(verify_supabase_jwt)])
 app.include_router(network.router, prefix="/api/network", tags=["Network Map"], dependencies=[Depends(verify_supabase_jwt)])
 app.include_router(kpi.router, prefix="/api/kpi", tags=["KPI Analytics"], dependencies=[Depends(verify_supabase_jwt)])
+app.include_router(network_map.router, prefix="/api/network-map", tags=["Network Visibility Map"])
 
 class STOEvent(BaseModel):
     sto_id: str
