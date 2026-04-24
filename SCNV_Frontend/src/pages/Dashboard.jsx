@@ -7,7 +7,7 @@ import AllocationEfficiencyCard from '../components/AllocationEfficiencyCard';
 import ProductiveTrendChart from '../components/ProductiveTrendChart';
 import SuboptimalCustomerTile from '../components/SuboptimalCustomerTile';
 import { STORAGE_KEYS, API_URL } from '../config/constants';
-import { Maximize2, X, Activity, Globe2 } from 'lucide-react';
+import { Maximize2, X, Activity, Globe2, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PlantNode from '../components/PlantNode';
 import DCNode from '../components/DCNode';
@@ -132,7 +132,28 @@ function DashboardPage({ sidebarCollapsed, setSidebarCollapsed, setSelectedAgent
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.06)'
               }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--color-text)' }}>Celonis EMS</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <a 
+                      href="https://royal-frieslandcampina.eu-3.celonis.cloud/package-manager/ui/studio/ui/spaces/91eccf88-cca1-456d-8802-fdaf1c49c35a/packages/46cce81e-2edc-43ac-8abb-0ddcbc5c7a5d/nodes/92a7a150-af50-430c-ab97-b82fd00cc008"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="celonis-studio-link"
+                      style={{ 
+                        fontSize: '0.875rem', 
+                        fontWeight: '600', 
+                        color: 'var(--color-text)',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.25rem',
+                        transition: 'color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#10b981'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text)'}
+                    >
+                      Celonis EMS <ExternalLink size={12} />
+                    </a>
+                  </div>
                   <span style={{ fontSize: '0.75rem', color: isCelonisEnabled ? '#10b981' : 'var(--color-muted)' }}>
                     {isCelonisEnabled ? 'Active (Intercepting)' : 'Disabled'}
                   </span>
@@ -164,7 +185,10 @@ function DashboardPage({ sidebarCollapsed, setSidebarCollapsed, setSelectedAgent
             <div className="dashboard-kpi-section__title">
               <Activity size={14} /> Allocation Efficiency KPIs
             </div>
-            <AllocationEfficiencyCard selectedCountry={selectedCountry} />
+            <AllocationEfficiencyCard 
+              selectedCountry={selectedCountry} 
+              isCelonisEnabled={isCelonisEnabled}
+            />
           </div>
 
           {/* Charts Row */}

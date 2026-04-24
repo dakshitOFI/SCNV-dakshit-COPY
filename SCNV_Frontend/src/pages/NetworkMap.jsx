@@ -66,6 +66,7 @@ export default function NetworkMapPage() {
   const [custFilter, setCustFilter] = useState([]);
   const [vendorFilter, setVendorFilter] = useState([]);
   const [plantFilter, setPlantFilter] = useState([]);
+  const [showSTO, setShowSTO] = useState(false);
   const [hiddenTypes, setHiddenTypes] = useState(new Set());
 
   // Fetch graph data
@@ -114,6 +115,34 @@ export default function NetworkMapPage() {
     const nR = n => nodeRadius(n, degree);
     const maxQty = d3.max(currentEdges, e => e.qty_kg || 0) || 1;
     const edgeW = e => Math.max(0.5, Math.min(6, ((e.qty_kg || 0) / maxQty) * 6));
+
+    // Pre-compute parallel edge groups: edges sharing the same pair of nodes get unique offsets
+    const edgePairMap = {};
+    currentEdges.forEach((e, i) => {
+      const sId = typeof e.source === 'object' ? e.source.id : e.source;
+      const tId = typeof e.target === 'object' ? e.target.id : e.target;
+      const pairKey = sId < tId ? `${sId}||${tId}` : `${tId}||${sId}`;
+      if (!edgePairMap[pairKey]) edgePairMap[pairKey] = [];
+      edgePairMap[pairKey].push(i);
+    });
+    // Assign each edge its index within its parallel group and the total count
+    const edgeGroupIndex = new Array(currentEdges.length);
+    const edgeGroupTotal = new Array(currentEdges.length);
+    Object.values(edgePairMap).forEach(indices => {
+      indices.forEach((edgeIdx, posInGroup) => {
+        edgeGroupIndex[edgeIdx] = posInGroup;
+        edgeGroupTotal[edgeIdx] = indices.length;
+      });
+    });
+
+    // Also pre-compute per-node edge counts for smart fan-out from busy nodes
+    const nodeEdgeCount = {};
+    currentEdges.forEach(e => {
+      const sId = typeof e.source === 'object' ? e.source.id : e.source;
+      const tId = typeof e.target === 'object' ? e.target.id : e.target;
+      nodeEdgeCount[sId] = (nodeEdgeCount[sId] || 0) + 1;
+      nodeEdgeCount[tId] = (nodeEdgeCount[tId] || 0) + 1;
+    });
 
     // Links (using paths to support curved STO transfers)
     const linkG = g.append('g');
@@ -216,7 +245,7 @@ export default function NetworkMapPage() {
             }
           }
         }
-        linkEls.attr('d', e => {
+        linkEls.attr('d', (e, i) => {
           if (typeof e.source !== 'object' || typeof e.target !== 'object') return '';
           const sx = e.source.x, sy = e.source.y;
           const dx = e.target.x - sx;
@@ -227,23 +256,38 @@ export default function NetworkMapPage() {
           const r = e.type === 'sto_transfer' ? (nodeH/2 + 6) : (nodeW/2 + 6);
           const tx = e.target.x - (dx/len) * r;
           const ty = e.target.y - (dy/len) * r;
+
+          // Get this edge's parallel group info
+          const groupIdx = edgeGroupIndex[i] || 0;
+          const groupTotal = edgeGroupTotal[i] || 1;
+          // Offset from center: -half..+half spread, centered at 0
+          const spreadUnit = 35; // px between parallel edges
+          const offset = (groupIdx - (groupTotal - 1) / 2) * spreadUnit;
+
+          // Normal vector perpendicular to the edge direction
+          const nx = -dy / len;
+          const ny = dx / len;
           
           if (e.type === 'sto_transfer') {
              // Arc for STO transfers (plant-to-plant vertical)
-             const dr = len * 1.2;
-             return `M${sx},${sy} A${dr},${dr} 0 0,1 ${tx},${ty}`;
+             const dr = len * (1.0 + groupIdx * 0.4);
+             const sweep = groupIdx % 2 === 0 ? 1 : 0;
+             return `M${sx},${sy} A${dr},${dr} 0 0,${sweep} ${tx},${ty}`;
           }
           
-          // Bending curve for cross-column edges using cubic bezier
-          // The control points offset horizontally at 1/3 and 2/3 of the way
-          const midX = (sx + tx) / 2;
+          // Smart bending: unique offset per parallel edge so they fan out
+          const midX = (sx + tx) / 2 + nx * offset;
+          const midY = (sy + ty) / 2 + ny * offset;
+
+          // Additional gentle curve offset based on vertical gap to avoid straight-line overlap
           const yGap = Math.abs(dy);
-          const bend = Math.min(yGap * 0.3, 60); // Bend proportional to vertical gap
-          const bendDir = sy < ty ? 1 : -1; // Bend upward or downward based on flow direction
-          const c1x = sx + (tx - sx) * 0.3;
-          const c1y = sy + bend * bendDir;
-          const c2x = sx + (tx - sx) * 0.7;
-          const c2y = ty - bend * bendDir;
+          const baseBend = Math.min(yGap * 0.15, 40);
+          const bendDir = sy < ty ? 1 : -1;
+          
+          const c1x = sx + (midX - sx) * 0.6 + nx * baseBend * bendDir;
+          const c1y = sy + (midY - sy) * 0.6 + ny * baseBend * bendDir;
+          const c2x = midX + (tx - midX) * 0.4 + nx * baseBend * bendDir;
+          const c2y = midY + (ty - midY) * 0.4 + ny * baseBend * bendDir;
           
           return `M${sx},${sy} C${c1x},${c1y} ${c2x},${c2y} ${tx},${ty}`;
         });
@@ -434,7 +478,18 @@ export default function NetworkMapPage() {
     const pipelineEdges = new Set();
 
     validEdges.forEach(e => {
-      if (filter !== 'all' && e.type !== filter) return;
+      // User requested: STO edges should only show when the Toggle is ON (or STO mode is active).
+      // They should be hidden by default in 'All' view to keep the map clean.
+      if (e.type === 'sto_transfer') {
+        const isSTOExplicitlyToggled = showSTO;
+        const isSTOModeActive = filter === 'sto_transfer';
+
+        if (!isSTOExplicitlyToggled && !isSTOModeActive) {
+          return;
+        }
+      } else {
+        if (filter !== 'all' && e.type !== filter) return;
+      }
 
       const s = typeof e.source === 'object' ? e.source.id : e.source;
       const t = typeof e.target === 'object' ? e.target.id : e.target;
@@ -500,7 +555,7 @@ export default function NetworkMapPage() {
       linkElsRef.current.classed('faded', false);
       if (edgeLabelElsRef.current) edgeLabelElsRef.current.classed('faded', false);
     }
-  }, [searchQuery, matFilter, custFilter, vendorFilter, plantFilter, filter, selectedNode, hiddenTypes, graphData, currentView]);
+  }, [searchQuery, matFilter, custFilter, vendorFilter, plantFilter, filter, showSTO, selectedNode, hiddenTypes, graphData, currentView]);
 
   const handleFocusNode = useCallback(id => {
     if (!graphData) return;
@@ -555,6 +610,16 @@ export default function NetworkMapPage() {
           <button className={`nm-btn ${filter==='procurement'?'active':''}`} onClick={()=>setFilter('procurement')}>📦 Procurement</button>
           <button className={`nm-btn ${filter==='sto_transfer'?'active':''}`} onClick={()=>setFilter('sto_transfer')}>🔄 STO</button>
           <button className={`nm-btn ${filter==='sales_delivery'?'active':''}`} onClick={()=>setFilter('sales_delivery')}>🚚 Delivery</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '12px', paddingLeft: '12px', borderLeft: '1px solid #333' }}>
+            <span style={{ fontSize: '11px', color: '#f5a623', fontWeight: '700', letterSpacing: '0.5px' }}>SHOW STO FLOWS</span>
+            <button 
+              className={`nm-btn ${showSTO?'active':''}`} 
+              onClick={()=>setShowSTO(!showSTO)}
+              style={showSTO ? { background: '#f5a623', borderColor: '#f5a623', color: '#000', fontWeight: 'bold' } : { color: '#888' }}
+            >
+              {showSTO ? 'ENABLED' : 'OFF'}
+            </button>
+          </div>
           <button className={`nm-btn ${currentView==='bom'?'active':''}`} onClick={() => { setCurrentView(currentView === 'network' ? 'bom' : 'network'); setFilter('all'); }} style={currentView === 'bom' ? { background: '#e8431f', borderColor: '#e8431f', color: '#fff' } : { borderColor: '#e8431f', color: '#e8431f' }}>🔄 BOM Flow View</button>
           <button className={`nm-btn ${showLabels?'active':''}`} onClick={()=>setShowLabels(!showLabels)}>Labels</button>
           <button className="nm-btn" onClick={resetZoom}>⊙ Reset</button>

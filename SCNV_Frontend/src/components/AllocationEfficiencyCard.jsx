@@ -1,97 +1,104 @@
-import React, { useState, useEffect } from 'react';
-import { Gauge, TrendingDown, Target } from 'lucide-react';
-import { API_URL, STORAGE_KEYS } from '../config/constants';
+import React from 'react';
+import { Milk, Info } from 'lucide-react';
 import StarBorder from './StarBorder';
 
-function AllocationEfficiencyCard({ selectedCountry }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+function AllocationEfficiencyCard({ selectedCountry, isCelonisEnabled }) {
+  const CELONIS_URL = "https://royal-frieslandcampina.eu-3.celonis.cloud/package-manager/ui/studio/ui/spaces/91eccf88-cca1-456d-8802-fdaf1c49c35a/packages/46cce81e-2edc-43ac-8abb-0ddcbc5c7a5d/nodes/92a7a150-af50-430c-ab97-b82fd00cc008";
 
-  useEffect(() => {
-    setLoading(true);
-    const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
-    const url = selectedCountry
-      ? `${API_URL}/api/kpi/allocation-efficiency?country=${selectedCountry}`
-      : `${API_URL}/api/kpi/allocation-efficiency`;
-
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [selectedCountry]);
-
-  if (loading) {
-    return (
-      <div className="kpi-efficiency-grid" style={{ display: 'flex', gap: '1.5rem' }}>
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="kpi-card kpi-card--loading" style={{ flex: 1 }}>
-            <div className="kpi-card__shimmer" />
-          </div>
-        ))}
-      </div>
-    );
-  }
-  if (!data) return null;
+  const handleKpiClick = () => {
+    if (isCelonisEnabled) {
+      window.open(CELONIS_URL, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   const metrics = [
     {
-      label: 'Allocation Efficiency',
-      value: `${data.allocation_efficiency_pct}%`,
-      icon: <Gauge size={20} />,
-      color: data.allocation_efficiency_pct >= 70 ? '#10b981' : data.allocation_efficiency_pct >= 50 ? '#f59e0b' : '#ef4444',
-      description: 'Avg efficiency score across all orders',
+      label: 'Total DE Milk Consumed At Lochem',
+      value: '163M KG',
+      icon: <Milk size={20} />,
+      color: '#3b82f6',
+      description: 'Historical consumption from DE sources',
     },
     {
-      label: 'Unproductive Transfer',
-      value: `${data.unproductive_transfer_ratio}%`,
-      icon: <TrendingDown size={20} />,
-      color: data.unproductive_transfer_ratio <= 30 ? '#10b981' : data.unproductive_transfer_ratio <= 50 ? '#f59e0b' : '#ef4444',
-      description: 'Ratio of unproductive volume vs total',
+      label: 'Total NL Milk Consumed At Lochem',
+      value: '178M KG',
+      icon: <Milk size={20} />,
+      color: '#10b981',
+      description: 'Historical consumption from NL sources',
     },
     {
-      label: 'Optimal Allocation',
-      value: `${data.optimal_allocation_ratio}%`,
-      icon: <Target size={20} />,
-      color: data.optimal_allocation_ratio >= 60 ? '#10b981' : data.optimal_allocation_ratio >= 40 ? '#f59e0b' : '#ef4444',
-      description: 'Orders allocated to optimal plant',
+      label: 'Total DE Milk Consumed For Selected Material',
+      value: '1.47M KG',
+      icon: <Info size={20} />,
+      color: '#f59e0b',
+      description: 'Material specific DE volume',
+    },
+    {
+      label: 'Total NL Milk Consumed For Selected Material',
+      value: '1.64M KG',
+      icon: <Info size={20} />,
+      color: '#e8431f',
+      description: 'Material specific NL volume',
     },
   ];
 
   return (
-    <div className="kpi-efficiency-grid" style={{ display: 'flex', gap: '1.5rem' }}>
+    <div className="kpi-efficiency-grid" style={{ 
+      display: 'grid', 
+      gridTemplateColumns: 'repeat(4, 1fr)', 
+      gap: '1rem' 
+    }}>
       {metrics.map((m) => (
         <StarBorder 
           key={m.label} 
-          color={m.color} 
-          speed="10s" 
-          thickness={2} 
-          style={{ flex: 1, borderRadius: '16px' }}
+          color={isCelonisEnabled ? '#1db8ff' : m.color} 
+          speed={isCelonisEnabled ? '5s' : '15s'} 
+          thickness={isCelonisEnabled ? 3 : 1} 
+          style={{ borderRadius: '16px' }}
         >
-          <div className="kpi-card" id={`kpi-${m.label.replace(/\s/g, '-').toLowerCase()}`} style={{ height: '100%', margin: 0, border: 'none' }}>
+          <div 
+            className="kpi-card" 
+            onClick={handleKpiClick}
+            style={{ 
+              height: '100%', 
+              margin: 0, 
+              border: 'none',
+              cursor: isCelonisEnabled ? 'pointer' : 'default',
+              transition: 'transform 0.2s',
+              background: 'white',
+              position: 'relative'
+            }}
+            onMouseEnter={e => isCelonisEnabled && (e.currentTarget.style.transform = 'translateY(-4px)')}
+            onMouseLeave={e => isCelonisEnabled && (e.currentTarget.style.transform = 'translateY(0)')}
+          >
+            {isCelonisEnabled && (
+              <div style={{
+                position: 'absolute', top: '8px', right: '8px',
+                fontSize: '10px', color: '#1db8ff', fontWeight: '700'
+              }}>
+                CELONIS LIVE
+              </div>
+            )}
             <div className="kpi-card__header">
-              <div className="kpi-card__icon" style={{ background: `${m.color}15`, color: m.color }}>
+              <div className="kpi-card__icon" style={{ 
+                background: `${isCelonisEnabled ? '#1db8ff' : m.color}15`, 
+                color: isCelonisEnabled ? '#1db8ff' : m.color 
+              }}>
                 {m.icon}
               </div>
-              <div className="kpi-card__trend-badge" style={{ background: `${m.color}15`, color: m.color }}>
-                {m.label.includes('Unproductive')
-                  ? (data.unproductive_transfer_ratio <= 30 ? '● Low' : '● High')
-                  : (parseFloat(m.value) >= 60 ? '● Good' : '● Needs Attention')}
-              </div>
             </div>
-            <div className="kpi-card__value" style={{ color: m.color }}>
+            <div className="kpi-card__value" style={{ 
+              color: isCelonisEnabled ? '#1db8ff' : m.color,
+              fontSize: '1.5rem',
+              fontWeight: '800'
+            }}>
               {m.value}
             </div>
-            <div className="kpi-card__label">{m.label}</div>
-            <div className="kpi-card__desc">{m.description}</div>
-
-            <div className="kpi-card__progress">
-              <div
-                className="kpi-card__progress-fill"
-                style={{
-                  width: `${Math.min(parseFloat(m.value), 100)}%`,
-                  background: `linear-gradient(90deg, ${m.color}, ${m.color}80)`,
-                }}
-              />
+            <div className="kpi-card__label" style={{ fontSize: '0.75rem', fontWeight: '600', minHeight: '2.5rem' }}>
+              {m.label}
+            </div>
+            <div className="kpi-card__desc" style={{ fontSize: '0.7rem' }}>
+              {m.description}
             </div>
           </div>
         </StarBorder>
