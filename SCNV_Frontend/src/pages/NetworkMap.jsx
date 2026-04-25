@@ -8,8 +8,13 @@ import NetworkInfoPanel from '../components/NetworkInfoPanel';
 import OfiLogo from '../components/OfiLogo';
 import '../styles/networkmap.css';
 
+const INITIAL_EDGE_LIMIT = 1800;
+const EDGE_LIMIT_STEP = 1800;
+const COLLISION_SKIP_NODE_THRESHOLD = 800;
+
 const MultiSelectDropdown = ({ title, options, selectedIds, toggleSelection, prefixToRemove }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [optionSearch, setOptionSearch] = useState('');
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -30,12 +35,45 @@ const MultiSelectDropdown = ({ title, options, selectedIds, toggleSelection, pre
       </div>
       {isOpen && (
         <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#1c1624', border: '1px solid var(--nm-border)', zIndex: 100, maxHeight: '240px', overflowY: 'auto', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
-          {options.map(opt => (
+          <div style={{ padding: '8px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <input
+              type="text"
+              value={optionSearch}
+              onChange={(e) => setOptionSearch(e.target.value)}
+              placeholder={`Search ${title.split(' ')[1] || title}...`}
+              style={{
+                width: '100%',
+                background: '#120f18',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#fff',
+                borderRadius: '4px',
+                fontSize: '12px',
+                padding: '7px 9px',
+                outline: 'none'
+              }}
+            />
+          </div>
+          {options
+            .filter(opt => {
+              if (!optionSearch.trim()) return true;
+              const q = optionSearch.toLowerCase().trim();
+              return opt.label.toLowerCase().includes(q) || opt.id.toLowerCase().includes(q);
+            })
+            .map(opt => (
             <div key={opt.id} onClick={() => toggleSelection(opt.id)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '8px', color: selectedIds.includes(opt.id) ? '#fff' : '#aaa', background: selectedIds.includes(opt.id) ? 'rgba(255,255,255,0.05)' : 'transparent' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = selectedIds.includes(opt.id) ? 'rgba(255,255,255,0.05)' : 'transparent'}>
               <span style={{ fontSize: '16px', color: selectedIds.includes(opt.id) ? '#e8431f' : '#666', lineHeight: 1 }}>{selectedIds.includes(opt.id) ? '☑' : '☐'}</span>
               <span style={{ fontSize: '13px' }}>{opt.label} ({opt.id.replace(prefixToRemove, '')})</span>
             </div>
           ))}
+          {options.filter(opt => {
+            if (!optionSearch.trim()) return true;
+            const q = optionSearch.toLowerCase().trim();
+            return opt.label.toLowerCase().includes(q) || opt.id.toLowerCase().includes(q);
+          }).length === 0 && (
+            <div style={{ padding: '10px 12px', color: '#888', fontSize: '12px' }}>
+              No matches found.
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -64,10 +102,11 @@ export default function NetworkMapPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [matFilter, setMatFilter] = useState('');
   const [custFilter, setCustFilter] = useState([]);
-  const [vendorFilter, setVendorFilter] = useState([]);
-  const [plantFilter, setPlantFilter] = useState([]);
+  const [vendorFilter, setVendorFilter] = useState(['VDR_0000700000']);
+  const [plantFilter, setPlantFilter] = useState(['PLT_3003']);
   const [showSTO, setShowSTO] = useState(false);
   const [hiddenTypes, setHiddenTypes] = useState(new Set());
+  const [edgeRenderLimit, setEdgeRenderLimit] = useState(INITIAL_EDGE_LIMIT);
 
   // Fetch graph data
   useEffect(() => {
@@ -82,6 +121,100 @@ export default function NetworkMapPage() {
   }, []);
 
   // Build D3 graph
+  const buildRenderSubgraph = useCallback((allNodes, allEdges) => {
+    const q = searchQuery.toLowerCase().trim();
+    const mq = matFilter;
+    const cArr = custFilter;
+    const vArr = vendorFilter;
+    const pArr = plantFilter;
+
+    const getPipelineNodes = (startId) => {
+      if (!startId) return new Set();
+      const pipeline = new Set([startId]);
+      const upstream = {};
+      const downstream = {};
+      allEdges.forEach(e => {
+        const s = typeof e.source === 'object' ? e.source.id : e.source;
+        const t = typeof e.target === 'object' ? e.target.id : e.target;
+        if (!upstream[t]) upstream[t] = [];
+        if (!downstream[s]) downstream[s] = [];
+        upstream[t].push(s);
+        downstream[s].push(t);
+      });
+
+      let queue = [startId];
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        const neighbors = upstream[curr] || [];
+        for (const n of neighbors) if (!pipeline.has(n)) { pipeline.add(n); queue.push(n); }
+      }
+
+      queue = [startId];
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        const neighbors = downstream[curr] || [];
+        for (const n of neighbors) if (!pipeline.has(n)) { pipeline.add(n); queue.push(n); }
+      }
+      return pipeline;
+    };
+
+    let validEdges = allEdges;
+    if (mq) validEdges = validEdges.filter(e => e.mats && e.mats.includes(mq));
+
+    let validNodes = new Set(allNodes.map(n => n.id));
+    const nodeIdSet = new Set(allNodes.map(n => n.id));
+    const applyMultiFilter = (selectedIds) => {
+      const validSelectedIds = selectedIds.filter(id => nodeIdSet.has(id));
+      if (!validSelectedIds.length) return;
+      const union = new Set();
+      validSelectedIds.forEach(id => getPipelineNodes(id).forEach(n => union.add(n)));
+      validNodes = new Set([...validNodes].filter(x => union.has(x)));
+    };
+    applyMultiFilter(cArr);
+    applyMultiFilter(vArr);
+    applyMultiFilter(pArr);
+
+    if (cArr.length || vArr.length || pArr.length) {
+      validEdges = validEdges.filter(e => {
+        const s = typeof e.source === 'object' ? e.source.id : e.source;
+        const t = typeof e.target === 'object' ? e.target.id : e.target;
+        return validNodes.has(s) && validNodes.has(t);
+      });
+    }
+
+    const matchIds = q ? new Set(allNodes
+      .filter(n => (n.label || '').toLowerCase().includes(q) || (n.id || '').toLowerCase().includes(q) ||
+        (n.city || '').toLowerCase().includes(q) || (n.country || '').toLowerCase().includes(q))
+      .map(n => n.id)) : null;
+
+    let filteredEdges = validEdges.filter(e => {
+      if (e.type === 'sto_transfer') {
+        if (!showSTO && filter !== 'sto_transfer') return false;
+      } else if (filter !== 'all' && e.type !== filter) {
+        return false;
+      }
+      const s = typeof e.source === 'object' ? e.source.id : e.source;
+      const t = typeof e.target === 'object' ? e.target.id : e.target;
+      if (q && !(matchIds.has(s) || matchIds.has(t))) return false;
+      return true;
+    });
+
+    const totalCandidateEdges = filteredEdges.length;
+    filteredEdges = filteredEdges
+      .slice()
+      .sort((a, b) => (b.qty_kg || 0) - (a.qty_kg || 0))
+      .slice(0, edgeRenderLimit);
+
+    const keepNodeIds = new Set();
+    filteredEdges.forEach(e => {
+      keepNodeIds.add(typeof e.source === 'object' ? e.source.id : e.source);
+      keepNodeIds.add(typeof e.target === 'object' ? e.target.id : e.target);
+    });
+
+    const filteredNodes = allNodes.filter(n => keepNodeIds.has(n.id));
+    return { nodes: filteredNodes, edges: filteredEdges, totalCandidateEdges };
+  }, [searchQuery, matFilter, custFilter, vendorFilter, plantFilter, filter, showSTO, edgeRenderLimit]);
+
   useEffect(() => {
     if (!graphData || !svgRef.current) return;
     const container = svgRef.current.parentElement;
@@ -108,8 +241,9 @@ export default function NetworkMapPage() {
     const g = svg.append('g');
     gRef.current = g;
 
-    const currentNodes = currentView === 'bom' ? (graphData.bom_nodes || []) : graphData.nodes;
-    const currentEdges = currentView === 'bom' ? (graphData.bom_edges || []) : graphData.edges;
+    const allNodes = currentView === 'bom' ? (graphData.bom_nodes || []) : currentView === 'batch' ? (graphData.batch_nodes || []) : graphData.nodes;
+    const allEdges = currentView === 'bom' ? (graphData.bom_edges || []) : currentView === 'batch' ? (graphData.batch_edges || []) : graphData.edges;
+    const { nodes: currentNodes, edges: currentEdges } = buildRenderSubgraph(allNodes, allEdges);
 
     const degree = computeDegrees(currentEdges);
     const nR = n => nodeRadius(n, degree);
@@ -221,26 +355,27 @@ export default function NetworkMapPage() {
       .force('y', d3.forceY(H / 2).strength(0.02))
       .force('collide', d3.forceCollide().radius(20).iterations(2)) // Base collision, refined in tick
       .on('tick', () => {
-        // Enforce strict rectangle bounding box collision to ensure they NEVER overlap
-        const padding = 12; // Gap between nodes
-        for (let iter = 0; iter < 2; iter++) { // iterations for stability
-          for (let i = 0; i < currentNodes.length; i++) {
-            for (let j = i + 1; j < currentNodes.length; j++) {
-              const a = currentNodes[i];
-              const b = currentNodes[j];
-              const dx = a.x - b.x;
-              const dy = a.y - b.y;
-              if (Math.abs(dx) < nodeW + padding && Math.abs(dy) < nodeH + padding) {
-                 const overlapY = (nodeH + padding) - Math.abs(dy);
-                 const overlapX = (nodeW + padding) - Math.abs(dx);
-                 // Resolve along the axis of least penetration
-                 if (overlapY < overlapX) {
-                   const push = overlapY / 2;
-                   if (dy > 0) { a.y += push; b.y -= push; } else { a.y -= push; b.y += push; }
-                 } else {
-                   const push = overlapX / 2;
-                   if (dx > 0) { a.x += push; b.x -= push; } else { a.x -= push; b.x += push; }
-                 }
+        // Enforce strict rectangle collision only on manageable graph sizes.
+        if (currentNodes.length <= COLLISION_SKIP_NODE_THRESHOLD) {
+          const padding = 12;
+          for (let iter = 0; iter < 2; iter++) {
+            for (let i = 0; i < currentNodes.length; i++) {
+              for (let j = i + 1; j < currentNodes.length; j++) {
+                const a = currentNodes[i];
+                const b = currentNodes[j];
+                const dx = a.x - b.x;
+                const dy = a.y - b.y;
+                if (Math.abs(dx) < nodeW + padding && Math.abs(dy) < nodeH + padding) {
+                  const overlapY = (nodeH + padding) - Math.abs(dy);
+                  const overlapX = (nodeW + padding) - Math.abs(dx);
+                  if (overlapY < overlapX) {
+                    const push = overlapY / 2;
+                    if (dy > 0) { a.y += push; b.y -= push; } else { a.y -= push; b.y += push; }
+                  } else {
+                    const push = overlapX / 2;
+                    if (dx > 0) { a.x += push; b.x -= push; } else { a.x -= push; b.x += push; }
+                  }
+                }
               }
             }
           }
@@ -350,7 +485,7 @@ export default function NetworkMapPage() {
     svg.on('click', () => setSelectedNode(null));
 
     return () => { sim.stop(); };
-  }, [graphData, currentView]);
+  }, [graphData, currentView, buildRenderSubgraph]);
 
   const uniqueMaterials = React.useMemo(() => {
     if (!graphData) return [];
@@ -583,6 +718,9 @@ export default function NetworkMapPage() {
   const topStoFlows = graphData ? graphData.edges
     .filter(e => e.type === 'sto_transfer').sort((a, b) => (b.qty_kg||0) - (a.qty_kg||0)).slice(0, 6) : [];
   const nodeMap = graphData ? Object.fromEntries((currentView === 'bom' ? graphData.bom_nodes || [] : graphData.nodes).map(n => [n.id, n])) : {};
+  const allNodesForCounter = graphData ? (currentView === 'bom' ? (graphData.bom_nodes || []) : currentView === 'batch' ? (graphData.batch_nodes || []) : graphData.nodes) : [];
+  const allEdgesForCounter = graphData ? (currentView === 'bom' ? (graphData.bom_edges || []) : currentView === 'batch' ? (graphData.batch_edges || []) : graphData.edges) : [];
+  const renderCounter = graphData ? buildRenderSubgraph(allNodesForCounter, allEdgesForCounter) : { edges: [], totalCandidateEdges: 0 };
 
   return (
     <div className="network-map-page">
@@ -620,9 +758,15 @@ export default function NetworkMapPage() {
               {showSTO ? 'ENABLED' : 'OFF'}
             </button>
           </div>
-          <button className={`nm-btn ${currentView==='bom'?'active':''}`} onClick={() => { setCurrentView(currentView === 'network' ? 'bom' : 'network'); setFilter('all'); }} style={currentView === 'bom' ? { background: '#e8431f', borderColor: '#e8431f', color: '#fff' } : { borderColor: '#e8431f', color: '#e8431f' }}>🔄 BOM Flow View</button>
+          <button className={`nm-btn ${currentView==='bom'?'active':''}`} onClick={() => { setCurrentView(currentView === 'bom' ? 'network' : 'bom'); setFilter('all'); }} style={currentView === 'bom' ? { background: '#e8431f', borderColor: '#e8431f', color: '#fff' } : { borderColor: '#e8431f', color: '#e8431f' }}>🔄 BOM Flow View</button>
+          <button className={`nm-btn ${currentView==='batch'?'active':''}`} onClick={() => { const toBatch = currentView !== 'batch'; setCurrentView(toBatch ? 'batch' : 'network'); setFilter('all'); if (toBatch) { setCustFilter([]); setVendorFilter([]); setPlantFilter([]); } }} style={currentView === 'batch' ? { background: '#1db8ff', borderColor: '#1db8ff', color: '#04111d' } : { borderColor: '#1db8ff', color: '#1db8ff' }}>🧪 Batch Flow View</button>
           <button className={`nm-btn ${showLabels?'active':''}`} onClick={()=>setShowLabels(!showLabels)}>Labels</button>
           <button className="nm-btn" onClick={resetZoom}>⊙ Reset</button>
+          <button className="nm-btn" onClick={() => setEdgeRenderLimit(prev => prev + EDGE_LIMIT_STEP)}>+ More Edges</button>
+          <button className="nm-btn" onClick={() => setEdgeRenderLimit(INITIAL_EDGE_LIMIT)}>Default Scope</button>
+          <div style={{ fontSize: '11px', color: '#9aa0a6', marginLeft: '8px' }}>
+            Showing {renderCounter.edges.length} / {renderCounter.totalCandidateEdges} edges
+          </div>
         </div>
       </header>
 

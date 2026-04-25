@@ -12,17 +12,19 @@ export const NODE_COLORS = {
   plant: '#22c55e',
   vendor: '#f5a623',
   customer: '#a78bfa',
-  material: '#e8431f'
+  material: '#e8431f',
+  batch: '#1db8ff'
 };
 
 export const NODE_FILLS = {
   plant: '#062c16',
   vendor: '#1c1606',
   customer: '#1b0d2e',
-  material: '#2b1d0d'
+  material: '#2b1d0d',
+  batch: '#0a1f33'
 };
 
-export const NODE_ICONS = { plant: '🏭', vendor: '🐄', customer: '🏪', material: '📦' };
+export const NODE_ICONS = { plant: '🏭', vendor: '🐄', customer: '🏪', material: '📦', batch: '🧪' };
 
 export const EDGE_TYPE_LABELS = {
   milk_intake: '🥛 Milk Intake',
