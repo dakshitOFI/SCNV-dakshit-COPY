@@ -62,7 +62,7 @@ const MultiSelectDropdown = ({ title, options, selectedIds, toggleSelection, pre
             .map(opt => (
             <div key={opt.id} onClick={() => toggleSelection(opt.id)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '8px', color: selectedIds.includes(opt.id) ? '#fff' : '#aaa', background: selectedIds.includes(opt.id) ? 'rgba(255,255,255,0.05)' : 'transparent' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = selectedIds.includes(opt.id) ? 'rgba(255,255,255,0.05)' : 'transparent'}>
               <span style={{ fontSize: '16px', color: selectedIds.includes(opt.id) ? '#e8431f' : '#666', lineHeight: 1 }}>{selectedIds.includes(opt.id) ? '☑' : '☐'}</span>
-              <span style={{ fontSize: '13px' }}>{opt.label} ({opt.id.replace(prefixToRemove, '')})</span>
+              <span style={{ fontSize: '13px' }}>{opt.label}{opt.id.replace(prefixToRemove, '') !== opt.label ? ` (${opt.id.replace(prefixToRemove, '')})` : ''}</span>
             </div>
           ))}
           {options.filter(opt => {
@@ -100,13 +100,22 @@ export default function NetworkMapPage() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [currentView, setCurrentView] = useState('network');
   const [searchQuery, setSearchQuery] = useState('');
-  const [matFilter, setMatFilter] = useState('');
+  const [matFilter, setMatFilter] = useState([]);
   const [custFilter, setCustFilter] = useState([]);
   const [vendorFilter, setVendorFilter] = useState(['VDR_0000700000']);
   const [plantFilter, setPlantFilter] = useState(['PLT_3003']);
+  const [batchCustFilter, setBatchCustFilter] = useState([]);
+  const [batchFilter, setBatchFilter] = useState([]);
   const [showSTO, setShowSTO] = useState(false);
   const [hiddenTypes, setHiddenTypes] = useState(new Set());
   const [edgeRenderLimit, setEdgeRenderLimit] = useState(INITIAL_EDGE_LIMIT);
+
+  // Batch table view state
+  const [batchTableMode, setBatchTableMode] = useState(false);
+  const [batchTableData, setBatchTableData] = useState([]);
+  const [batchTableLoading, setBatchTableLoading] = useState(false);
+  const [batchMatFilter, setBatchMatFilter] = useState('');
+  const [batchCustSearch, setBatchCustSearch] = useState('');
 
   // Fetch graph data
   useEffect(() => {
@@ -120,6 +129,22 @@ export default function NetworkMapPage() {
       .catch(err => { setError(err.message); setLoading(false); });
   }, []);
 
+  // Fetch batch table data
+  const fetchBatchTable = useCallback((mat = '', cust = '') => {
+    setBatchTableLoading(true);
+    const params = new URLSearchParams();
+    if (mat)  params.set('material', mat);
+    if (cust) params.set('customer', cust);
+    fetch(`${API_URL}/api/network-map/batches?${params}`)
+      .then(r => r.json())
+      .then(data => { setBatchTableData(data.batches || []); setBatchTableLoading(false); })
+      .catch(() => setBatchTableLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (batchTableMode && batchTableData.length === 0) fetchBatchTable();
+  }, [batchTableMode]);
+
   // Build D3 graph
   const buildRenderSubgraph = useCallback((allNodes, allEdges) => {
     const q = searchQuery.toLowerCase().trim();
@@ -127,6 +152,8 @@ export default function NetworkMapPage() {
     const cArr = custFilter;
     const vArr = vendorFilter;
     const pArr = plantFilter;
+    const bcArr = batchCustFilter;
+    const bfArr = batchFilter;
 
     const getPipelineNodes = (startId) => {
       if (!startId) return new Set();
@@ -159,7 +186,7 @@ export default function NetworkMapPage() {
     };
 
     let validEdges = allEdges;
-    if (mq) validEdges = validEdges.filter(e => e.mats && e.mats.includes(mq));
+    if (mq.length) validEdges = validEdges.filter(e => e.mats && mq.some(m => e.mats.includes(m)));
 
     let validNodes = new Set(allNodes.map(n => n.id));
     const nodeIdSet = new Set(allNodes.map(n => n.id));
@@ -179,6 +206,54 @@ export default function NetworkMapPage() {
         const s = typeof e.source === 'object' ? e.source.id : e.source;
         const t = typeof e.target === 'object' ? e.target.id : e.target;
         return validNodes.has(s) && validNodes.has(t);
+      });
+    }
+
+    // Batch customer filter: trace all ancestors of batches delivered to selected customers
+    if (bcArr.length > 0) {
+      const batchCustomerMap = graphData?.batch_customer_map || {};
+      const endpointIds = new Set();
+      bcArr.forEach(custId => (batchCustomerMap[custId] || []).forEach(bId => endpointIds.add(bId)));
+
+      const upstream = {};
+      allEdges.forEach(e => {
+        const s = typeof e.source === 'object' ? e.source.id : e.source;
+        const t = typeof e.target === 'object' ? e.target.id : e.target;
+        if (!upstream[t]) upstream[t] = [];
+        upstream[t].push(s);
+      });
+
+      const traceSet = new Set(endpointIds);
+      const queue = [...endpointIds];
+      while (queue.length) {
+        const curr = queue.shift();
+        for (const anc of (upstream[curr] || [])) {
+          if (!traceSet.has(anc)) { traceSet.add(anc); queue.push(anc); }
+        }
+      }
+
+      validNodes = new Set([...validNodes].filter(x => traceSet.has(x)));
+      validEdges = validEdges.filter(e => {
+        const s = typeof e.source === 'object' ? e.source.id : e.source;
+        const t = typeof e.target === 'object' ? e.target.id : e.target;
+        return traceSet.has(s) && traceSet.has(t);
+      });
+    }
+
+    // Batch number filter: trace full pipeline (up + downstream) for selected batches
+    if (bfArr.length > 0) {
+      const selectedNodeIds = new Set();
+      allNodes.forEach(n => {
+        const batchId = (n.label || '').split(' @ ')[0];
+        if (bfArr.includes(batchId)) selectedNodeIds.add(n.id);
+      });
+      const traceSet = new Set();
+      selectedNodeIds.forEach(id => getPipelineNodes(id).forEach(n => traceSet.add(n)));
+      validNodes = new Set([...validNodes].filter(x => traceSet.has(x)));
+      validEdges = validEdges.filter(e => {
+        const s = typeof e.source === 'object' ? e.source.id : e.source;
+        const t = typeof e.target === 'object' ? e.target.id : e.target;
+        return traceSet.has(s) && traceSet.has(t);
       });
     }
 
@@ -213,7 +288,7 @@ export default function NetworkMapPage() {
 
     const filteredNodes = allNodes.filter(n => keepNodeIds.has(n.id));
     return { nodes: filteredNodes, edges: filteredEdges, totalCandidateEdges };
-  }, [searchQuery, matFilter, custFilter, vendorFilter, plantFilter, filter, showSTO, edgeRenderLimit]);
+  }, [searchQuery, matFilter, custFilter, vendorFilter, plantFilter, batchCustFilter, batchFilter, filter, showSTO, edgeRenderLimit, graphData]);
 
   useEffect(() => {
     if (!graphData || !svgRef.current) return;
@@ -493,7 +568,7 @@ export default function NetworkMapPage() {
     graphData.edges.forEach(e => {
       if (e.mats) e.mats.forEach(m => mats.add(m));
     });
-    return Array.from(mats).sort();
+    return Array.from(mats).sort().map(m => ({ id: m, label: m }));
   }, [graphData]);
 
   const uniqueCustomers = React.useMemo(() => {
@@ -517,6 +592,27 @@ export default function NetworkMapPage() {
     return graphData.nodes
       .filter(n => n.type === 'plant')
       .map(n => ({ id: n.id, label: n.label || n.id }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [graphData]);
+
+  const uniqueBatches = React.useMemo(() => {
+    if (!graphData?.batch_nodes) return [];
+    const seen = new Set();
+    const result = [];
+    graphData.batch_nodes.forEach(n => {
+      const batchId = (n.label || '').split(' @ ')[0];
+      if (batchId && !seen.has(batchId)) { seen.add(batchId); result.push({ id: batchId, label: batchId }); }
+    });
+    return result.sort((a, b) => a.label.localeCompare(b.label));
+  }, [graphData]);
+
+  const uniqueBatchCustomers = React.useMemo(() => {
+    if (!graphData?.batch_customer_map) return [];
+    return Object.keys(graphData.batch_customer_map)
+      .map(id => {
+        const node = graphData.nodes.find(n => n.id === id);
+        return { id, label: node?.label || id.replace('CST_', '') };
+      })
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [graphData]);
 
@@ -575,8 +671,8 @@ export default function NetworkMapPage() {
     };
 
     let validEdges = currentEdges;
-    if (mq) {
-      validEdges = validEdges.filter(e => e.mats && e.mats.includes(mq));
+    if (mq.length) {
+      validEdges = validEdges.filter(e => e.mats && mq.some(m => e.mats.includes(m)));
     }
 
     let validNodes = new Set(currentNodes.map(n => n.id));
@@ -642,7 +738,7 @@ export default function NetworkMapPage() {
       }
     });
 
-    const isPipelineFiltered = q || mq || cArr.length || vArr.length || pArr.length || filter !== 'all';
+    const isPipelineFiltered = q || mq.length || cArr.length || vArr.length || pArr.length || batchCustFilter.length || batchFilter.length || filter !== 'all';
     
     // Toggle element visibility (display: none) so "only that pipeline is visible"
     nodeElsRef.current.style('display', n => {
@@ -690,7 +786,7 @@ export default function NetworkMapPage() {
       linkElsRef.current.classed('faded', false);
       if (edgeLabelElsRef.current) edgeLabelElsRef.current.classed('faded', false);
     }
-  }, [searchQuery, matFilter, custFilter, vendorFilter, plantFilter, filter, showSTO, selectedNode, hiddenTypes, graphData, currentView]);
+  }, [searchQuery, matFilter, custFilter, vendorFilter, plantFilter, batchCustFilter, batchFilter, filter, showSTO, selectedNode, hiddenTypes, graphData, currentView]);
 
   const handleFocusNode = useCallback(id => {
     if (!graphData) return;
@@ -759,7 +855,24 @@ export default function NetworkMapPage() {
             </button>
           </div>
           <button className={`nm-btn ${currentView==='bom'?'active':''}`} onClick={() => { setCurrentView(currentView === 'bom' ? 'network' : 'bom'); setFilter('all'); }} style={currentView === 'bom' ? { background: '#e8431f', borderColor: '#e8431f', color: '#fff' } : { borderColor: '#e8431f', color: '#e8431f' }}>🔄 BOM Flow View</button>
-          <button className={`nm-btn ${currentView==='batch'?'active':''}`} onClick={() => { const toBatch = currentView !== 'batch'; setCurrentView(toBatch ? 'batch' : 'network'); setFilter('all'); if (toBatch) { setCustFilter([]); setVendorFilter([]); setPlantFilter([]); } }} style={currentView === 'batch' ? { background: '#1db8ff', borderColor: '#1db8ff', color: '#04111d' } : { borderColor: '#1db8ff', color: '#1db8ff' }}>🧪 Batch Flow View</button>
+          <button className={`nm-btn ${currentView==='batch'?'active':''}`} onClick={() => { const toBatch = currentView !== 'batch'; setCurrentView(toBatch ? 'batch' : 'network'); setFilter('all'); if (toBatch) { setCustFilter([]); setVendorFilter([]); setPlantFilter([]); } else { setBatchCustFilter([]); setBatchFilter([]); } }} style={currentView === 'batch' ? { background: '#1db8ff', borderColor: '#1db8ff', color: '#04111d' } : { borderColor: '#1db8ff', color: '#1db8ff' }}>🧪 Batch Flow View</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '12px', paddingLeft: '12px', borderLeft: '1px solid #333' }}>
+            <span style={{ fontSize: '10px', color: '#9aa0a6', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>View</span>
+            <button
+              className={`nm-btn ${!batchTableMode ? 'active' : ''}`}
+              onClick={() => setBatchTableMode(false)}
+              style={!batchTableMode ? { background: '#1db8ff', borderColor: '#1db8ff', color: '#04111d', fontWeight: 700 } : { color: '#888' }}
+            >
+              Material
+            </button>
+            <button
+              className={`nm-btn ${batchTableMode ? 'active' : ''}`}
+              onClick={() => setBatchTableMode(true)}
+              style={batchTableMode ? { background: '#a78bfa', borderColor: '#a78bfa', color: '#04111d', fontWeight: 700 } : { color: '#888' }}
+            >
+              Batch Table
+            </button>
+          </div>
           <button className={`nm-btn ${showLabels?'active':''}`} onClick={()=>setShowLabels(!showLabels)}>Labels</button>
           <button className="nm-btn" onClick={resetZoom}>⊙ Reset</button>
           <button className="nm-btn" onClick={() => setEdgeRenderLimit(prev => prev + EDGE_LIMIT_STEP)}>+ More Edges</button>
@@ -770,79 +883,173 @@ export default function NetworkMapPage() {
         </div>
       </header>
 
+      {/* KPI Bar */}
+      {stats && (
+        <div className="nm-kpi-bar">
+          <div className="nm-kpi-card vendor">
+            <div className="nm-kpi-val">{stats.nVendor}</div>
+            <div className="nm-kpi-label">Vendors</div>
+          </div>
+          <div className="nm-kpi-card plant">
+            <div className="nm-kpi-val">{stats.nPlant}</div>
+            <div className="nm-kpi-label">Plants</div>
+          </div>
+          <div className="nm-kpi-card customer">
+            <div className="nm-kpi-val">{stats.nCust}</div>
+            <div className="nm-kpi-label">Customers</div>
+          </div>
+          <div className="nm-kpi-card gr">
+            <div className="nm-kpi-val">{fmt(stats.milkKg + stats.procKg)}</div>
+            <div className="nm-kpi-label">Total GR Volume</div>
+            <div className="nm-kpi-sub">kg</div>
+          </div>
+          <div className="nm-kpi-card gi">
+            <div className="nm-kpi-val">{fmt(stats.delKg)}</div>
+            <div className="nm-kpi-label">Total GI Volume</div>
+            <div className="nm-kpi-sub">kg</div>
+          </div>
+          <div className="nm-kpi-card sto">
+            <div className="nm-kpi-val">{stats.nEdge}</div>
+            <div className="nm-kpi-label">Total Flows</div>
+          </div>
+        </div>
+      )}
+
       {/* Main */}
       <main className="nm-main">
         {/* Left sidebar */}
         <aside className="nm-aside">
           <div>
             <div className="nm-panel-title">Filters</div>
-            <div className="nm-search-wrap" style={{ marginTop: 8 }}>
-              <span className="nm-search-icon">🔍</span>
-              <input className="nm-search-input" placeholder="Search (Plant, Vendor, City)…"
-                value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-            </div>
-            <div className="nm-search-wrap" style={{ marginTop: 6 }}>
-              <span className="nm-search-icon">📦</span>
-              <select className="nm-search-input" style={{ appearance: 'none' }}
-                value={matFilter} onChange={e => setMatFilter(e.target.value)}>
-                <option value="">All Materials</option>
-                {uniqueMaterials.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="nm-search-wrap" style={{ marginTop: 6 }}>
-              <span className="nm-search-icon">🏪</span>
-              <MultiSelectDropdown 
-                title="Select Customers…" 
-                options={uniqueCustomers} 
-                selectedIds={custFilter} 
-                toggleSelection={(id) => toggleMulti(custFilter, setCustFilter, id)} 
-                prefixToRemove="CST_" 
-              />
-              {custFilter.length > 0 && <div className="nm-chips">
-                {custFilter.map(id => { const c = uniqueCustomers.find(x => x.id === id); return (
-                  <span key={id} className="nm-chip cust" onClick={() => toggleMulti(custFilter, setCustFilter, id)}>
-                    {c ? c.label.slice(0,14) : id} ✕
-                  </span>
-                ); })}
-                <span className="nm-chip-clear" onClick={() => setCustFilter([])}>Clear</span>
-              </div>}
-            </div>
-            <div className="nm-search-wrap" style={{ marginTop: 6 }}>
-              <span className="nm-search-icon">🏭</span>
-              <MultiSelectDropdown 
-                title="Select Vendors…" 
-                options={uniqueVendors} 
-                selectedIds={vendorFilter} 
-                toggleSelection={(id) => toggleMulti(vendorFilter, setVendorFilter, id)} 
-                prefixToRemove="VDR_" 
-              />
-              {vendorFilter.length > 0 && <div className="nm-chips">
-                {vendorFilter.map(id => { const v = uniqueVendors.find(x => x.id === id); return (
-                  <span key={id} className="nm-chip vendor" onClick={() => toggleMulti(vendorFilter, setVendorFilter, id)}>
-                    {v ? v.label.slice(0,14) : id} ✕
-                  </span>
-                ); })}
-                <span className="nm-chip-clear" onClick={() => setVendorFilter([])}>Clear</span>
-              </div>}
-            </div>
-            <div className="nm-search-wrap" style={{ marginTop: 6 }}>
-              <span className="nm-search-icon">🏗️</span>
-              <MultiSelectDropdown 
-                title="Select Plants…" 
-                options={uniquePlants} 
-                selectedIds={plantFilter} 
-                toggleSelection={(id) => toggleMulti(plantFilter, setPlantFilter, id)} 
-                prefixToRemove="PLT_" 
-              />
-              {plantFilter.length > 0 && <div className="nm-chips">
-                {plantFilter.map(id => { const p = uniquePlants.find(x => x.id === id); return (
-                  <span key={id} className="nm-chip plant" onClick={() => toggleMulti(plantFilter, setPlantFilter, id)}>
-                    {p ? p.label.slice(0,14) : id} ✕
-                  </span>
-                ); })}
-                <span className="nm-chip-clear" onClick={() => setPlantFilter([])}>Clear</span>
-              </div>}
-            </div>
+            {currentView === 'batch' ? (
+              <>
+                <div style={{ marginTop: 8, marginBottom: 6, fontSize: '11px', color: '#1db8ff', fontWeight: 600, letterSpacing: '0.4px' }}>
+                  TRACE BATCH LINEAGE BY CUSTOMER
+                </div>
+                <div className="nm-search-wrap" style={{ marginTop: 0 }}>
+                  <span className="nm-search-icon">🏪</span>
+                  <MultiSelectDropdown
+                    title="Select Customers…"
+                    options={uniqueBatchCustomers}
+                    selectedIds={batchCustFilter}
+                    toggleSelection={(id) => toggleMulti(batchCustFilter, setBatchCustFilter, id)}
+                    prefixToRemove="CST_"
+                  />
+                  {batchCustFilter.length > 0 && <div className="nm-chips">
+                    {batchCustFilter.map(id => { const c = uniqueBatchCustomers.find(x => x.id === id); return (
+                      <span key={id} className="nm-chip cust" onClick={() => toggleMulti(batchCustFilter, setBatchCustFilter, id)}>
+                        {c ? c.label.slice(0, 14) : id} ✕
+                      </span>
+                    ); })}
+                    <span className="nm-chip-clear" onClick={() => setBatchCustFilter([])}>Clear</span>
+                  </div>}
+                </div>
+                <div style={{ marginTop: 10, marginBottom: 4, fontSize: '11px', color: '#1db8ff', fontWeight: 600, letterSpacing: '0.4px' }}>
+                  OR FILTER BY BATCH NUMBER
+                </div>
+                <div className="nm-search-wrap" style={{ marginTop: 0 }}>
+                  <span className="nm-search-icon">🧪</span>
+                  <MultiSelectDropdown
+                    title="Select Batches…"
+                    options={uniqueBatches}
+                    selectedIds={batchFilter}
+                    toggleSelection={(id) => toggleMulti(batchFilter, setBatchFilter, id)}
+                    prefixToRemove=""
+                  />
+                  {batchFilter.length > 0 && <div className="nm-chips">
+                    {batchFilter.map(id => (
+                      <span key={id} className="nm-chip" style={{ background: 'rgba(27,184,255,0.2)', border: '1px solid #1db8ff' }} onClick={() => toggleMulti(batchFilter, setBatchFilter, id)}>
+                        {id.slice(0, 14)} ✕
+                      </span>
+                    ))}
+                    <span className="nm-chip-clear" onClick={() => setBatchFilter([])}>Clear</span>
+                  </div>}
+                </div>
+                <div style={{ marginTop: 8, fontSize: '11px', color: '#6b7280', lineHeight: 1.5 }}>
+                  Shows full lineage (upstream + downstream) for selected batches. Combine with customer filter to intersect both.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="nm-search-wrap" style={{ marginTop: 8 }}>
+                  <span className="nm-search-icon">🔍</span>
+                  <input className="nm-search-input" placeholder="Search (Plant, Vendor, City)…"
+                    value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                </div>
+                <div className="nm-search-wrap" style={{ marginTop: 6 }}>
+                  <span className="nm-search-icon">📦</span>
+                  <MultiSelectDropdown
+                    title="Select Materials…"
+                    options={uniqueMaterials}
+                    selectedIds={matFilter}
+                    toggleSelection={(id) => toggleMulti(matFilter, setMatFilter, id)}
+                    prefixToRemove=""
+                  />
+                  {matFilter.length > 0 && <div className="nm-chips">
+                    {matFilter.map(id => (
+                      <span key={id} className="nm-chip mat" onClick={() => toggleMulti(matFilter, setMatFilter, id)}>
+                        {id.slice(0, 14)} ✕
+                      </span>
+                    ))}
+                    <span className="nm-chip-clear" onClick={() => setMatFilter([])}>Clear</span>
+                  </div>}
+                </div>
+                <div className="nm-search-wrap" style={{ marginTop: 6 }}>
+                  <span className="nm-search-icon">🏪</span>
+                  <MultiSelectDropdown
+                    title="Select Customers…"
+                    options={uniqueCustomers}
+                    selectedIds={custFilter}
+                    toggleSelection={(id) => toggleMulti(custFilter, setCustFilter, id)}
+                    prefixToRemove="CST_"
+                  />
+                  {custFilter.length > 0 && <div className="nm-chips">
+                    {custFilter.map(id => { const c = uniqueCustomers.find(x => x.id === id); return (
+                      <span key={id} className="nm-chip cust" onClick={() => toggleMulti(custFilter, setCustFilter, id)}>
+                        {c ? c.label.slice(0,14) : id} ✕
+                      </span>
+                    ); })}
+                    <span className="nm-chip-clear" onClick={() => setCustFilter([])}>Clear</span>
+                  </div>}
+                </div>
+                <div className="nm-search-wrap" style={{ marginTop: 6 }}>
+                  <span className="nm-search-icon">🏭</span>
+                  <MultiSelectDropdown
+                    title="Select Vendors…"
+                    options={uniqueVendors}
+                    selectedIds={vendorFilter}
+                    toggleSelection={(id) => toggleMulti(vendorFilter, setVendorFilter, id)}
+                    prefixToRemove="VDR_"
+                  />
+                  {vendorFilter.length > 0 && <div className="nm-chips">
+                    {vendorFilter.map(id => { const v = uniqueVendors.find(x => x.id === id); return (
+                      <span key={id} className="nm-chip vendor" onClick={() => toggleMulti(vendorFilter, setVendorFilter, id)}>
+                        {v ? v.label.slice(0,14) : id} ✕
+                      </span>
+                    ); })}
+                    <span className="nm-chip-clear" onClick={() => setVendorFilter([])}>Clear</span>
+                  </div>}
+                </div>
+                <div className="nm-search-wrap" style={{ marginTop: 6 }}>
+                  <span className="nm-search-icon">🏗️</span>
+                  <MultiSelectDropdown
+                    title="Select Plants…"
+                    options={uniquePlants}
+                    selectedIds={plantFilter}
+                    toggleSelection={(id) => toggleMulti(plantFilter, setPlantFilter, id)}
+                    prefixToRemove="PLT_"
+                  />
+                  {plantFilter.length > 0 && <div className="nm-chips">
+                    {plantFilter.map(id => { const p = uniquePlants.find(x => x.id === id); return (
+                      <span key={id} className="nm-chip plant" onClick={() => toggleMulti(plantFilter, setPlantFilter, id)}>
+                        {p ? p.label.slice(0,14) : id} ✕
+                      </span>
+                    ); })}
+                    <span className="nm-chip-clear" onClick={() => setPlantFilter([])}>Clear</span>
+                  </div>}
+                </div>
+              </>
+            )}
           </div>
 
           <div>
@@ -893,22 +1100,86 @@ export default function NetworkMapPage() {
           </div>
         </aside>
 
-        {/* Graph */}
-        <div className="nm-graph-container">
-          {loading && <div className="nm-loading"><div className="nm-loader" /><div className="nm-loader-text">Building supply chain graph…</div></div>}
-          {error && <div className="nm-error"><div className="nm-error-icon">⚠️</div><div className="nm-error-title">Could not load graph data</div>
-            <div className="nm-error-desc">Make sure the backend is running and build_graph.py has been executed.</div>
-            <div className="nm-error-code">{error}</div></div>}
-          <svg ref={svgRef} className="nm-graph-svg" />
-          <div className="nm-zoom-controls">
-            <button className="nm-zoom-btn" onClick={zoomIn}>+</button>
-            <button className="nm-zoom-btn" onClick={zoomOut}>−</button>
-            <button className="nm-zoom-btn" onClick={resetZoom}>⊙</button>
+        {/* Graph or Batch Table */}
+        {batchTableMode ? (
+          <div className="nm-batch-table-wrapper">
+            <div className="nm-batch-table-toolbar">
+              <span style={{ fontSize: 13, color: '#a78bfa', fontWeight: 600 }}>Batch Shipments (GI 601)</span>
+              <input
+                className="nm-batch-filter-input"
+                placeholder="Filter by material…"
+                value={batchMatFilter}
+                onChange={e => setBatchMatFilter(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && fetchBatchTable(batchMatFilter, batchCustSearch)}
+              />
+              <input
+                className="nm-batch-filter-input"
+                placeholder="Filter by customer code…"
+                value={batchCustSearch}
+                onChange={e => setBatchCustSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && fetchBatchTable(batchMatFilter, batchCustSearch)}
+              />
+              <button className="nm-btn" onClick={() => fetchBatchTable(batchMatFilter, batchCustSearch)}>Apply</button>
+              <button className="nm-btn" onClick={() => { setBatchMatFilter(''); setBatchCustSearch(''); fetchBatchTable('', ''); }}>Clear</button>
+              <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 'auto' }}>
+                {batchTableData.length} rows (max 200)
+              </span>
+            </div>
+            {batchTableLoading ? (
+              <div className="nm-loading"><div className="nm-loader" /><div className="nm-loader-text">Loading batch data…</div></div>
+            ) : (
+              <div className="nm-batch-table-scroll">
+                <table className="nm-batch-table">
+                  <thead>
+                    <tr>
+                      <th>Batch</th>
+                      <th>Material</th>
+                      <th>Plant</th>
+                      <th>Customer</th>
+                      <th style={{ textAlign: 'right' }}>Qty (kg)</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batchTableData.map((row, i) => (
+                      <tr key={i}>
+                        <td><span className="nm-batch-tag">{row.batch_id}</span></td>
+                        <td style={{ color: '#f5a623' }}>{row.material}</td>
+                        <td>{row.plant_name || row.plant}</td>
+                        <td>{row.customer_name || row.customer}</td>
+                        <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(row.qty_kg)}</td>
+                        <td style={{ color: '#6b7280' }}>{row.doc_date || '—'}</td>
+                      </tr>
+                    ))}
+                    {batchTableData.length === 0 && (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', color: '#6b7280', padding: '32px', fontSize: 13 }}>
+                          No batch data found. Try clearing filters or check database connectivity.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
+        ) : (
+          <div className="nm-graph-container">
+            {loading && <div className="nm-loading"><div className="nm-loader" /><div className="nm-loader-text">Building supply chain graph…</div></div>}
+            {error && <div className="nm-error"><div className="nm-error-icon">⚠️</div><div className="nm-error-title">Could not load graph data</div>
+              <div className="nm-error-desc">Make sure the backend is running and build_graph.py has been executed.</div>
+              <div className="nm-error-code">{error}</div></div>}
+            <svg ref={svgRef} className="nm-graph-svg" />
+            <div className="nm-zoom-controls">
+              <button className="nm-zoom-btn" onClick={zoomIn}>+</button>
+              <button className="nm-zoom-btn" onClick={zoomOut}>−</button>
+              <button className="nm-zoom-btn" onClick={resetZoom}>⊙</button>
+            </div>
+          </div>
+        )}
 
-        {/* Info panel */}
-        {selectedNode && <NetworkInfoPanel node={selectedNode} graphData={graphData} currentView={currentView}
+        {/* Info panel — only in graph mode */}
+        {!batchTableMode && selectedNode && <NetworkInfoPanel node={selectedNode} graphData={graphData} currentView={currentView}
           onClose={() => setSelectedNode(null)} onFocusNode={handleFocusNode} />}
       </main>
 
@@ -918,3 +1189,6 @@ export default function NetworkMapPage() {
     </div>
   );
 }
+
+
+

@@ -8,6 +8,7 @@ render the same D3 map without relying on a static JSON export.
 from collections import defaultdict
 from datetime import datetime, timedelta
 import os
+from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
@@ -310,20 +311,22 @@ def _build_graph_from_db() -> dict:
         """)).mappings().first()
 
         # Batch-view graph (batch-to-batch flow without plant/vendor/customer nodes).
-        # 1) STO batch transfers out (source plant batch -> receiving plant batch)
+        # 1) STO batch transfers out (source plant batch -> receiving plant batch).
+        # Only 641 (cross-company GI) and 643 (same-company GI) — 644 is the reversal of 643 and must be excluded.
+        # Destination is always umwrk (receiving plant); umlgo is a storage location field and must not be used here.
         sto_batch_rows = conn.execute(text("""
             SELECT
               m.charg AS batch_id,
               m.werks AS source_plant,
-              COALESCE(NULLIF(m.umwrk, ''), NULLIF(m.umlgo, '')) AS receiving_plant,
+              m.umwrk AS receiving_plant,
               SUM(CASE WHEN m.menge ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN m.menge::numeric ELSE 0 END) AS qty_kg,
               COUNT(*) AS doc_count
             FROM public.mseg m
             WHERE COALESCE(m.charg, '') <> ''
               AND COALESCE(m.werks, '') <> ''
               AND COALESCE(m.umwrk, '') <> ''
-              AND m.bwart IN ('641', '643', '644')
-            GROUP BY m.charg, m.werks, COALESCE(NULLIF(m.umwrk, ''), NULLIF(m.umlgo, ''))
+              AND m.bwart IN ('641', '643')
+            GROUP BY m.charg, m.werks, m.umwrk
         """)).mappings().all()
 
         for r in sto_batch_rows:
@@ -340,25 +343,44 @@ def _build_graph_from_db() -> dict:
             batch_edges_by_key[key]["qty_kg"] += _safe_qty(r["qty_kg"])
             batch_edges_by_key[key]["count"] += int(r["doc_count"] or 0)
 
-        # 2) Production batch transformation (consumed batch -> produced batch by production order)
+        # 2) Production batch transformation (consumed batch -> produced batch by production order).
+        # Pre-aggregate both sides in CTEs before joining to avoid Cartesian quantity double-counting.
+        # Without CTEs, a single GI row joined to N GR document lines produces N copies of gi.menge,
+        # causing SUM(gi.menge) to be multiplied by N — yielding wrong quantities.
         prod_batch_rows = conn.execute(text("""
+            WITH gi_agg AS (
+                SELECT
+                  aufnr,
+                  charg,
+                  COALESCE(NULLIF(werks, ''), 'UNK') AS werks,
+                  SUM(CASE WHEN menge ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN menge::numeric ELSE 0 END) AS qty_kg,
+                  COUNT(*) AS gi_count
+                FROM public.mseg
+                WHERE COALESCE(aufnr, '') <> ''
+                  AND bwart = '261'
+                  AND COALESCE(charg, '') <> ''
+                GROUP BY aufnr, charg, COALESCE(NULLIF(werks, ''), 'UNK')
+            ),
+            gr_dist AS (
+                SELECT DISTINCT
+                  aufnr,
+                  charg,
+                  COALESCE(NULLIF(werks, ''), 'UNK') AS werks
+                FROM public.mseg
+                WHERE COALESCE(aufnr, '') <> ''
+                  AND bwart = '101'
+                  AND COALESCE(charg, '') <> ''
+            )
             SELECT
               gi.charg AS src_batch,
-              COALESCE(NULLIF(gi.werks, ''), 'UNK') AS src_plant,
-              gr.charg AS dst_batch,
-              COALESCE(NULLIF(gr.werks, ''), 'UNK') AS dst_plant,
-              SUM(CASE WHEN gi.menge ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN gi.menge::numeric ELSE 0 END) AS qty_kg,
-              COUNT(*) AS doc_count
-            FROM public.mseg gi
-            JOIN public.mseg gr
-              ON gr.aufnr = gi.aufnr
-            WHERE COALESCE(gi.aufnr, '') <> ''
-              AND gi.bwart = '261'
-              AND gr.bwart = '101'
-              AND COALESCE(gi.charg, '') <> ''
-              AND COALESCE(gr.charg, '') <> ''
-            GROUP BY gi.charg, COALESCE(NULLIF(gi.werks, ''), 'UNK'), gr.charg, COALESCE(NULLIF(gr.werks, ''), 'UNK')
-            ORDER BY doc_count DESC
+              gi.werks  AS src_plant,
+              gr.charg  AS dst_batch,
+              gr.werks  AS dst_plant,
+              gi.qty_kg,
+              gi.gi_count AS doc_count
+            FROM gi_agg gi
+            JOIN gr_dist gr ON gr.aufnr = gi.aufnr
+            ORDER BY gi.qty_kg DESC
             LIMIT 6000
         """)).mappings().all()
 
@@ -376,6 +398,34 @@ def _build_graph_from_db() -> dict:
             key = (src_id, dst_id, "transformation")
             batch_edges_by_key[key]["qty_kg"] += _safe_qty(r["qty_kg"])
             batch_edges_by_key[key]["count"] += int(r["doc_count"] or 0)
+
+        # Batch-to-customer linkage: which batch nodes were shipped to which customer.
+        # Only movement 601 (goods issue to customer) — 602 is the reversal and must be excluded
+        # to avoid mapping customers to batches that were actually returned/cancelled.
+        batch_cust_rows = conn.execute(text("""
+            SELECT
+              kunnr,
+              charg AS batch_id,
+              werks,
+              COUNT(*) AS doc_count
+            FROM public.mseg
+            WHERE COALESCE(kunnr, '') <> ''
+              AND COALESCE(charg, '') <> ''
+              AND COALESCE(werks, '') <> ''
+              AND bwart = '601'
+            GROUP BY kunnr, charg, werks
+        """)).mappings().all()
+
+        batch_customer_map = defaultdict(list)
+        for r in batch_cust_rows:
+            cust_code = _clean_code(r["kunnr"])
+            batch_id = _clean_code(r["batch_id"])
+            plant = _clean_code(r["werks"])
+            if not cust_code or not batch_id or not plant:
+                continue
+            cust_id = _prefixed(cust_code, "CST_")
+            batch_node_id = f"BAT_{batch_id}_{plant}"
+            batch_customer_map[cust_id].append(batch_node_id)
 
     # Build edge list compatible with existing frontend.
     edges = []
@@ -476,6 +526,7 @@ def _build_graph_from_db() -> dict:
         "bom_nodes": sorted(bom_nodes_dict.values(), key=lambda n: n["id"]),
         "bom_edges": bom_edges,
         "batch_nodes": sorted(batch_nodes_by_id.values(), key=lambda n: n["id"]),
+        "batch_customer_map": {k: list(set(v)) for k, v in batch_customer_map.items()},
         "batch_edges": sorted(
             [
                 {
@@ -575,5 +626,250 @@ async def get_graph_stats():
             "sto_transfer_kg": round(sto_kg, 0),
             "delivery_kg": round(delivery_kg, 0),
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Focused endpoints for the Network Visibility page ──────────────────────────
+
+@router.get("/summary")
+async def get_summary():
+    """KPI counts: distinct vendors/plants/customers + total GR and GI volumes."""
+    engine = _get_engine()
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("""
+                SELECT
+                    (SELECT COUNT(DISTINCT lifnr)
+                     FROM public.mseg
+                     WHERE COALESCE(lifnr,'') <> '' AND bwart = '101') AS vendors,
+                    (SELECT COUNT(DISTINCT werks)
+                     FROM public.t001w
+                     WHERE COALESCE(werks,'') <> '') AS plants,
+                    (SELECT COUNT(DISTINCT kunnr)
+                     FROM public.mseg
+                     WHERE COALESCE(kunnr,'') <> '' AND bwart = '601') AS customers,
+                    (SELECT COALESCE(SUM(
+                         CASE WHEN menge ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                              THEN menge::numeric ELSE 0 END), 0)
+                     FROM public.mseg WHERE bwart = '101') AS total_gr_kg,
+                    (SELECT COALESCE(SUM(
+                         CASE WHEN menge ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                              THEN menge::numeric ELSE 0 END), 0)
+                     FROM public.mseg WHERE bwart = '601') AS total_gi_kg
+            """)).mappings().first()
+            return {
+                "vendors": int(row["vendors"] or 0),
+                "plants": int(row["plants"] or 0),
+                "customers": int(row["customers"] or 0),
+                "total_gr_kg": float(row["total_gr_kg"] or 0),
+                "total_gi_kg": float(row["total_gi_kg"] or 0),
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/nodes")
+async def get_nodes():
+    """All vendor/plant/customer nodes (max 300 per type)."""
+    engine = _get_engine()
+    try:
+        with engine.connect() as conn:
+            vendor_rows = conn.execute(text("""
+                SELECT DISTINCT m.lifnr,
+                    COALESCE(v.name1, '') AS name1,
+                    COALESCE(v.land1, '') AS land1
+                FROM public.mseg m
+                LEFT JOIN public.lfa1 v ON v.lifnr = m.lifnr
+                WHERE COALESCE(m.lifnr, '') <> '' AND m.bwart = '101'
+                LIMIT 300
+            """)).mappings().all()
+
+            plant_rows = conn.execute(text("""
+                SELECT werks,
+                    COALESCE(name1, '') AS name1,
+                    COALESCE(land1, '') AS land1
+                FROM public.t001w
+                WHERE COALESCE(werks, '') <> ''
+                LIMIT 300
+            """)).mappings().all()
+
+            customer_rows = conn.execute(text("""
+                SELECT DISTINCT m.kunnr,
+                    COALESCE(c.name1, '') AS name1,
+                    COALESCE(c.land1, '') AS land1
+                FROM public.mseg m
+                LEFT JOIN public.kna1 c ON c.kunnr = m.kunnr
+                WHERE COALESCE(m.kunnr, '') <> '' AND m.bwart = '601'
+                LIMIT 300
+            """)).mappings().all()
+
+            nodes = []
+            for r in vendor_rows:
+                code = _clean_code(r["lifnr"])
+                nodes.append({"id": f"VDR_{code}", "label": r["name1"] or code, "type": "vendor", "country": r["land1"]})
+            for r in plant_rows:
+                code = _clean_code(r["werks"])
+                nodes.append({"id": f"PLT_{code}", "label": r["name1"] or code, "type": "plant", "country": r["land1"]})
+            for r in customer_rows:
+                code = _clean_code(r["kunnr"])
+                nodes.append({"id": f"CST_{code}", "label": r["name1"] or code, "type": "customer", "country": r["land1"]})
+
+            return {"nodes": nodes}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/edges")
+async def get_edges(material: Optional[str] = None):
+    """
+    Flows between nodes with KG quantities.
+    Edge types: vendor_plant (101 GR), plant_plant (STO), plant_customer (601 GI).
+    Optional ?material= filter.
+    """
+    engine = _get_engine()
+    try:
+        params = {"material": material}
+        with engine.connect() as conn:
+            vp_rows = conn.execute(text("""
+                SELECT lifnr AS src, werks AS dst, 'vendor_plant' AS edge_type,
+                    SUM(CASE WHEN menge ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN menge::numeric ELSE 0 END) AS qty_kg,
+                    COUNT(*) AS doc_count
+                FROM public.mseg
+                WHERE COALESCE(lifnr,'') <> '' AND COALESCE(werks,'') <> ''
+                  AND bwart = '101'
+                  AND (:material IS NULL OR matnr = :material)
+                GROUP BY lifnr, werks
+                ORDER BY qty_kg DESC
+                LIMIT 500
+            """), params).mappings().all()
+
+            pp_rows = conn.execute(text("""
+                SELECT werks AS src, umwrk AS dst, 'plant_plant' AS edge_type,
+                    SUM(CASE WHEN menge ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN menge::numeric ELSE 0 END) AS qty_kg,
+                    COUNT(*) AS doc_count
+                FROM public.mseg
+                WHERE COALESCE(werks,'') <> '' AND COALESCE(umwrk,'') <> '' AND werks <> umwrk
+                  AND (:material IS NULL OR matnr = :material)
+                GROUP BY werks, umwrk
+                ORDER BY qty_kg DESC
+                LIMIT 500
+            """), params).mappings().all()
+
+            pc_rows = conn.execute(text("""
+                SELECT werks AS src, kunnr AS dst, 'plant_customer' AS edge_type,
+                    SUM(CASE WHEN menge ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN menge::numeric ELSE 0 END) AS qty_kg,
+                    COUNT(*) AS doc_count
+                FROM public.mseg
+                WHERE COALESCE(werks,'') <> '' AND COALESCE(kunnr,'') <> ''
+                  AND bwart = '601'
+                  AND (:material IS NULL OR matnr = :material)
+                GROUP BY werks, kunnr
+                ORDER BY qty_kg DESC
+                LIMIT 500
+            """), params).mappings().all()
+
+        edges = []
+        for r in vp_rows:
+            edges.append({
+                "source": f"VDR_{_clean_code(r['src'])}",
+                "target": f"PLT_{_clean_code(r['dst'])}",
+                "type": r["edge_type"],
+                "qty_kg": _safe_qty(r["qty_kg"]),
+                "count": int(r["doc_count"] or 0),
+            })
+        for r in pp_rows:
+            edges.append({
+                "source": f"PLT_{_clean_code(r['src'])}",
+                "target": f"PLT_{_clean_code(r['dst'])}",
+                "type": r["edge_type"],
+                "qty_kg": _safe_qty(r["qty_kg"]),
+                "count": int(r["doc_count"] or 0),
+            })
+        for r in pc_rows:
+            edges.append({
+                "source": f"PLT_{_clean_code(r['src'])}",
+                "target": f"CST_{_clean_code(r['dst'])}",
+                "type": r["edge_type"],
+                "qty_kg": _safe_qty(r["qty_kg"]),
+                "count": int(r["doc_count"] or 0),
+            })
+        return {"edges": edges}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/materials")
+async def get_materials():
+    """Searchable material list for dropdown (distinct matnr from mseg)."""
+    engine = _get_engine()
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT DISTINCT matnr
+                FROM public.mseg
+                WHERE COALESCE(matnr, '') <> ''
+                ORDER BY matnr
+                LIMIT 1000
+            """)).mappings().all()
+            return {
+                "materials": [
+                    {"id": _clean_code(r["matnr"]), "label": _clean_code(r["matnr"])}
+                    for r in rows
+                ]
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/batches")
+async def get_batches(material: Optional[str] = None, customer: Optional[str] = None):
+    """
+    Batch-level drill-down: batch → plant → customer with qty and posting date.
+    Optional ?material= and ?customer= filters. Returns up to 200 rows.
+    """
+    engine = _get_engine()
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text("""
+                SELECT
+                    m.charg   AS batch_id,
+                    m.werks   AS plant,
+                    COALESCE(w.name1, '') AS plant_name,
+                    m.kunnr   AS customer,
+                    COALESCE(c.name1, '') AS customer_name,
+                    m.matnr   AS material,
+                    SUM(CASE WHEN m.menge ~ '^-?[0-9]+(\\.[0-9]+)?$'
+                             THEN m.menge::numeric ELSE 0 END) AS qty_kg,
+                    MAX(h.budat) AS doc_date
+                FROM public.mseg m
+                LEFT JOIN public.mkpf h ON h.mblnr = m.mblnr AND h.mjahr = m.mjahr
+                LEFT JOIN public.t001w w ON w.werks = m.werks
+                LEFT JOIN public.kna1  c ON c.kunnr  = m.kunnr
+                WHERE m.bwart = '601'
+                  AND COALESCE(m.charg,  '') <> ''
+                  AND COALESCE(m.kunnr,  '') <> ''
+                  AND (:material IS NULL OR m.matnr  = :material)
+                  AND (:customer IS NULL OR m.kunnr  = :customer)
+                GROUP BY m.charg, m.werks, w.name1, m.kunnr, c.name1, m.matnr
+                ORDER BY MAX(h.budat) DESC NULLS LAST
+                LIMIT 200
+            """), {"material": material, "customer": customer}).mappings().all()
+
+            return {
+                "batches": [
+                    {
+                        "batch_id":      _clean_code(r["batch_id"]),
+                        "plant":         _clean_code(r["plant"]),
+                        "plant_name":    r["plant_name"],
+                        "customer":      _clean_code(r["customer"]),
+                        "customer_name": r["customer_name"],
+                        "material":      _clean_code(r["material"]),
+                        "qty_kg":        _safe_qty(r["qty_kg"]),
+                        "doc_date":      str(r["doc_date"]) if r["doc_date"] else None,
+                    }
+                    for r in rows
+                ]
+            }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
