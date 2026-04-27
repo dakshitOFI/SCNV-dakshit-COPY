@@ -12,9 +12,19 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
-      - key: SUPABASE_URL
+      - key: FRONTEND_URL
         sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "120"
       - key: NEO4J_URI
         sync: false
+      - key: NEO4J_USERNAME
+        sync: false
       - key: NEO4J_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
         sync: false
