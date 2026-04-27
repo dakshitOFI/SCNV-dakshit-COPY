@@ -325,11 +325,75 @@ Reply in this EXACT JSON format with absolutely no extra text or explanation:
         return {"route": "generic", "metric": None}
 
 
+DEMO_RESPONSES = {
+    "at risk stock transfer order": {
+        "answer": (
+            "**🔴 At-Risk Stock Transfer Order Report — Global Network**\n\n"
+            "The Orchestrator has scanned the active STO pipeline. "
+            "**9 STOs are flagged as at-risk** across Belgium, Netherlands, and Germany, "
+            "representing **61,460 HL of volume** currently at exposure.\n\n"
+            "---\n\n"
+            "**Critical Risk (Confidence < 65%)**\n\n"
+            "| STO ID | Country | Movement | Volume (HL) | Confidence | Status |\n"
+            "|---|---|---|---|---|---|\n"
+            "| STO_100006 | 🇩🇪 DE | Plant → DC | 6,847 | 51% | Not Goods-Issued |\n"
+            "| STO_100009 | 🇳🇱 NL | Plant → Plant | 658 | 55% | Not Goods-Issued |\n"
+            "| STO_100001 | 🇳🇱 NL | Plant → DC | 15,726 | 60% | Pre-GI Pending |\n"
+            "| STO_100007 | 🇳🇱 NL | Plant → Plant | 652 | 63% | Pre-GI Pending |\n"
+            "| STO_100011 | 🇧🇪 BE | Plant → Plant | 382 | 63% | Pre-GI Pending |\n\n"
+            "**High Risk (Confidence 65–75%)**\n\n"
+            "| STO ID | Country | Movement | Volume (HL) | Confidence | Status |\n"
+            "|---|---|---|---|---|---|\n"
+            "| STO_100010 | 🇧🇪 BE | Plant → DC | 678 | 69% | Not Goods-Issued |\n"
+            "| STO_100002 | 🇳🇱 NL | Plant → Plant | 2,108 | 70% | Pre-GI Pending |\n"
+            "| STO_100013 | 🇩🇪 DE | Plant → DC | 18,717 | 72% | Pre-GI Pending |\n"
+            "| STO_100005 | 🇧🇪 BE | Plant → Plant | 15,692 | 73% | Not Goods-Issued |\n\n"
+            "---\n\n"
+            "**Strategic Analysis**\n\n"
+            "- **STO_100013 (DE)** is the highest volume critical case — 18,717 HL of Plant → DC "
+            "movement at only 72% confidence. A misroute here would directly impact German customer "
+            "fulfilment and should be reviewed immediately.\n"
+            "- **STO_100001 (NL)** carries 15,726 HL with 60% confidence — the largest volume in "
+            "the critical band. The pre-GI status means there is still time to intervene before "
+            "goods are physically moved.\n"
+            "- **STO_100005 (BE)** is a Plant → Plant movement of 15,692 HL that has not been "
+            "goods-issued, flagged for potential unproductive lateral movement.\n\n"
+            "**Recommended Actions**\n\n"
+            "1. Escalate STO_100013, STO_100001, and STO_100005 to the SCM Analyst for Tier 2 review.\n"
+            "2. Hold goods issue on STO_100006 and STO_100009 pending classification confirmation.\n"
+            "3. Trigger the Optimizer Agent to evaluate alternative routing for the NL cluster "
+            "(STO_100001, STO_100002, STO_100007, STO_100009)."
+        ),
+        "sources": [
+            {
+                "type": "sto_data",
+                "source": "incoming_stos_extended.json",
+                "page": "1",
+                "confidence": 0.97,
+                "text_snippet": "9 at-risk STOs | 61,460 HL at exposure | Countries: BE, NL, DE"
+            }
+        ]
+    }
+}
+
+def _match_demo(message: str) -> dict | None:
+    key = message.lower().strip()
+    for demo_key, response in DEMO_RESPONSES.items():
+        if demo_key in key or key in demo_key:
+            return response
+    return None
+
+
 @router.post("/")
 async def chat(req: ChatRequest):
     try:
         if not orchestrator:
             return {"answer": "Error: Orchestrator offline.", "sources": []}
+
+        # ── Demo intercept ────────────────────────────────────────────────────
+        demo_response = _match_demo(req.message)
+        if demo_response:
+            return demo_response
 
         agent_id = req.agent_id
 
