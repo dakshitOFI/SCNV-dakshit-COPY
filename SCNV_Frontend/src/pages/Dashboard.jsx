@@ -17,6 +17,15 @@ import StarBorder from '../components/StarBorder';
 function DashboardPage({ sidebarCollapsed, setSidebarCollapsed, setSelectedAgent }) {
   const navigate = useNavigate();
   const CELONIS_KPI_URL = 'https://royal-frieslandcampina.eu-3.celonis.cloud/package-manager/ui/studio/ui/spaces/91eccf88-cca1-456d-8802-fdaf1c49c35a/packages/46cce81e-2edc-43ac-8abb-0ddcbc5c7a5d/nodes/92a7a150-af50-430c-ab97-b82fd00cc008?activeTabs=a2ba135a_2b1d_41bd_bfa8_1e860e9c06ee-view:2f56a941-62df-4d37-b75e-e4efa2639c98';
+
+  // Helper function to format numbers with K suffix
+  const formatKpiValue = (value) => {
+    if (!value && value !== 0) return '0';
+    if (value >= 1000) {
+      return (value / 1000).toFixed(2).replace(/\.?0+$/, '') + 'K';
+    }
+    return value.toString();
+  };
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,18 +92,18 @@ function DashboardPage({ sidebarCollapsed, setSidebarCollapsed, setSelectedAgent
   }, [authData.token]);
 
   useEffect(() => {
-    const fetchDashboardKpis = async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/network-map/graph-data`);
-        if (!res.ok) throw new Error('Failed to fetch dashboard KPIs');
-        const data = await res.json();
-        setDashboardKpis(data.kpis || null);
-      } catch (err) {
-        console.error(err);
-        setDashboardKpiError(err.message);
-      }
+    // Hardcoded KPIs
+    const hardcodedKpis = {
+      batches_received_from_vendor: 51000,
+      batches_produced_at_plant: 912,
+      batches_shipped_to_customer: 4960,
+      sto_batches_transfers_out: 8280,
+      sto_batches_transfers_in: 0,
+      production_orders: 912,
+      purchase_orders: 5950,
+      sales_orders: 4960
     };
-    fetchDashboardKpis();
+    setDashboardKpis(hardcodedKpis);
   }, []);
 
   const mapContent = loading ? (
@@ -220,28 +229,28 @@ function DashboardPage({ sidebarCollapsed, setSidebarCollapsed, setSelectedAgent
             {dashboardKpis && (
               <div className="kpi-efficiency-grid">
                 <div className="kpi-card" onClick={handleKpiCardClick} style={{ cursor: isCelonisEnabled ? 'pointer' : 'default' }} title={isCelonisEnabled ? 'Open in Celonis EMS' : 'Enable Celonis EMS to open'}>
-                  <div className="kpi-card__value">{dashboardKpis.batches_received_from_vendor?.toLocaleString() || '0'}</div><div className="kpi-card__label">Batches Received From Vendor</div>
+                  <div className="kpi-card__value">{formatKpiValue(dashboardKpis.batches_received_from_vendor)}</div><div className="kpi-card__label">Batches Received From Vendor</div>
                 </div>
                 <div className="kpi-card" onClick={handleKpiCardClick} style={{ cursor: isCelonisEnabled ? 'pointer' : 'default' }} title={isCelonisEnabled ? 'Open in Celonis EMS' : 'Enable Celonis EMS to open'}>
-                  <div className="kpi-card__value">{dashboardKpis.batches_produced_at_plant?.toLocaleString() || '0'}</div><div className="kpi-card__label">Batches Produced At Plant</div>
+                  <div className="kpi-card__value">{formatKpiValue(dashboardKpis.batches_produced_at_plant)}</div><div className="kpi-card__label">Batches Produced At Plant</div>
                 </div>
                 <div className="kpi-card" onClick={handleKpiCardClick} style={{ cursor: isCelonisEnabled ? 'pointer' : 'default' }} title={isCelonisEnabled ? 'Open in Celonis EMS' : 'Enable Celonis EMS to open'}>
-                  <div className="kpi-card__value">{dashboardKpis.batches_shipped_to_customer?.toLocaleString() || '0'}</div><div className="kpi-card__label">Batches Shipped To Customer</div>
+                  <div className="kpi-card__value">{formatKpiValue(dashboardKpis.batches_shipped_to_customer)}</div><div className="kpi-card__label">Batches Shipped To Customer</div>
                 </div>
                 <div className="kpi-card" onClick={handleKpiCardClick} style={{ cursor: isCelonisEnabled ? 'pointer' : 'default' }} title={isCelonisEnabled ? 'Open in Celonis EMS' : 'Enable Celonis EMS to open'}>
-                  <div className="kpi-card__value">{dashboardKpis.sto_batches_transfers_out?.toLocaleString() || '0'}</div><div className="kpi-card__label">STO Batches Transfers Out</div>
+                  <div className="kpi-card__value">{formatKpiValue(dashboardKpis.sto_batches_transfers_out)}</div><div className="kpi-card__label">STO Batches Transfers Out</div>
                 </div>
                 <div className="kpi-card" onClick={handleKpiCardClick} style={{ cursor: isCelonisEnabled ? 'pointer' : 'default' }} title={isCelonisEnabled ? 'Open in Celonis EMS' : 'Enable Celonis EMS to open'}>
-                  <div className="kpi-card__value">{dashboardKpis.sto_batches_transfers_in?.toLocaleString() || '0'}</div><div className="kpi-card__label">STO Batches Transfers In</div>
+                  <div className="kpi-card__value">{formatKpiValue(dashboardKpis.sto_batches_transfers_in)}</div><div className="kpi-card__label">STO Batches Transfers In</div>
                 </div>
                 <div className="kpi-card" onClick={handleKpiCardClick} style={{ cursor: isCelonisEnabled ? 'pointer' : 'default' }} title={isCelonisEnabled ? 'Open in Celonis EMS' : 'Enable Celonis EMS to open'}>
-                  <div className="kpi-card__value">{dashboardKpis.production_orders?.toLocaleString() || '0'}</div><div className="kpi-card__label">Production Orders</div>
+                  <div className="kpi-card__value">{formatKpiValue(dashboardKpis.production_orders)}</div><div className="kpi-card__label">Production Orders</div>
                 </div>
                 <div className="kpi-card" onClick={handleKpiCardClick} style={{ cursor: isCelonisEnabled ? 'pointer' : 'default' }} title={isCelonisEnabled ? 'Open in Celonis EMS' : 'Enable Celonis EMS to open'}>
-                  <div className="kpi-card__value">{dashboardKpis.purchase_orders?.toLocaleString() || '0'}</div><div className="kpi-card__label">Purchase Orders</div>
+                  <div className="kpi-card__value">{formatKpiValue(dashboardKpis.purchase_orders)}</div><div className="kpi-card__label">Purchase Orders</div>
                 </div>
                 <div className="kpi-card" onClick={handleKpiCardClick} style={{ cursor: isCelonisEnabled ? 'pointer' : 'default' }} title={isCelonisEnabled ? 'Open in Celonis EMS' : 'Enable Celonis EMS to open'}>
-                  <div className="kpi-card__value">{dashboardKpis.sales_orders?.toLocaleString() || '0'}</div><div className="kpi-card__label">Sales Orders</div>
+                  <div className="kpi-card__value">{formatKpiValue(dashboardKpis.sales_orders)}</div><div className="kpi-card__label">Sales Orders</div>
                 </div>
               </div>
             )}

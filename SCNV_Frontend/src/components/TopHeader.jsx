@@ -133,13 +133,6 @@ function TopHeader({ authData, onLogout, onSelectAgent }) {
               >
                 Decisions
               </button>
-
-              <button
-                className="fc-nav__item"
-                onClick={() => navigate('/chat')}
-              >
-                Network Insights
-              </button>
             </nav>
 
             {/* Right actions: search + hamburger */}
@@ -240,16 +233,6 @@ function TopHeader({ authData, onLogout, onSelectAgent }) {
               <Network size={18} />
             </div>
             <span>AI Agents</span>
-          </button>
-
-          <button
-            className="fc-sidebar__item"
-            onClick={() => handleNav('/chat')}
-          >
-            <div className="fc-sidebar__item-icon">
-              <Activity size={18} />
-            </div>
-            <span>Network Insights</span>
           </button>
         </nav>
 

@@ -12,7 +12,7 @@ const INITIAL_EDGE_LIMIT = 1800;
 const EDGE_LIMIT_STEP = 1800;
 const COLLISION_SKIP_NODE_THRESHOLD = 800;
 
-const MultiSelectDropdown = ({ title, options, selectedIds, toggleSelection, prefixToRemove }) => {
+const MultiSelectDropdown = ({ title, options, selectedIds, toggleSelection, prefixToRemove, pinnedIds = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [optionSearch, setOptionSearch] = useState('');
   const dropdownRef = useRef(null);
@@ -26,6 +26,23 @@ const MultiSelectDropdown = ({ title, options, selectedIds, toggleSelection, pre
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const renderOption = (opt) => (
+    <div key={opt.id} onClick={() => toggleSelection(opt.id)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '8px', color: selectedIds.includes(opt.id) ? '#fff' : '#aaa', background: selectedIds.includes(opt.id) ? 'rgba(255,255,255,0.05)' : 'transparent' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = selectedIds.includes(opt.id) ? 'rgba(255,255,255,0.05)' : 'transparent'}>
+      <span style={{ fontSize: '16px', color: selectedIds.includes(opt.id) ? '#e8431f' : '#666', lineHeight: 1 }}>{selectedIds.includes(opt.id) ? '☑' : '☐'}</span>
+      <span style={{ fontSize: '13px' }}>{opt.label}{opt.id.replace(prefixToRemove, '') !== opt.label ? ` (${opt.id.replace(prefixToRemove, '')})` : ''}</span>
+    </div>
+  );
+
+  const pinnedOptions = pinnedIds.map(id => options.find(o => o.id === id)).filter(Boolean);
+  const q = optionSearch.toLowerCase().trim();
+  const filteredRest = options.filter(opt => {
+    if (pinnedIds.includes(opt.id)) return false;
+    if (!q) return true;
+    return opt.label.toLowerCase().includes(q) || opt.id.toLowerCase().includes(q);
+  });
+  const filteredPinned = pinnedOptions.filter(opt => !q || opt.label.toLowerCase().includes(q) || opt.id.toLowerCase().includes(q));
+  const hasResults = filteredPinned.length > 0 || filteredRest.length > 0;
 
   return (
     <div className="nm-custom-dropdown" ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
@@ -53,23 +70,15 @@ const MultiSelectDropdown = ({ title, options, selectedIds, toggleSelection, pre
               }}
             />
           </div>
-          {options
-            .filter(opt => {
-              if (!optionSearch.trim()) return true;
-              const q = optionSearch.toLowerCase().trim();
-              return opt.label.toLowerCase().includes(q) || opt.id.toLowerCase().includes(q);
-            })
-            .map(opt => (
-            <div key={opt.id} onClick={() => toggleSelection(opt.id)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '8px', color: selectedIds.includes(opt.id) ? '#fff' : '#aaa', background: selectedIds.includes(opt.id) ? 'rgba(255,255,255,0.05)' : 'transparent' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'} onMouseLeave={e => e.currentTarget.style.background = selectedIds.includes(opt.id) ? 'rgba(255,255,255,0.05)' : 'transparent'}>
-              <span style={{ fontSize: '16px', color: selectedIds.includes(opt.id) ? '#e8431f' : '#666', lineHeight: 1 }}>{selectedIds.includes(opt.id) ? '☑' : '☐'}</span>
-              <span style={{ fontSize: '13px' }}>{opt.label}{opt.id.replace(prefixToRemove, '') !== opt.label ? ` (${opt.id.replace(prefixToRemove, '')})` : ''}</span>
-            </div>
-          ))}
-          {options.filter(opt => {
-            if (!optionSearch.trim()) return true;
-            const q = optionSearch.toLowerCase().trim();
-            return opt.label.toLowerCase().includes(q) || opt.id.toLowerCase().includes(q);
-          }).length === 0 && (
+          {pinnedOptions.length > 0 && (
+            <>
+              <div style={{ padding: '4px 12px', fontSize: '10px', color: '#1db8ff', letterSpacing: '0.06em', fontWeight: 600, background: 'rgba(29,184,255,0.06)', borderBottom: '1px solid rgba(29,184,255,0.15)' }}>PINNED</div>
+              {pinnedOptions.map(renderOption)}
+              {filteredRest.length > 0 && <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }} />}
+            </>
+          )}
+          {filteredRest.map(renderOption)}
+          {!hasResults && (
             <div style={{ padding: '10px 12px', color: '#888', fontSize: '12px' }}>
               No matches found.
             </div>
@@ -102,8 +111,8 @@ export default function NetworkMapPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [matFilter, setMatFilter] = useState([]);
   const [custFilter, setCustFilter] = useState([]);
-  const [vendorFilter, setVendorFilter] = useState(['VDR_0000700000']);
-  const [plantFilter, setPlantFilter] = useState(['PLT_3003']);
+  const [vendorFilter, setVendorFilter] = useState([]);
+  const [plantFilter, setPlantFilter] = useState([]);
   const [batchCustFilter, setBatchCustFilter] = useState([]);
   const [batchFilter, setBatchFilter] = useState([]);
   const [showSTO, setShowSTO] = useState(false);
@@ -883,37 +892,6 @@ export default function NetworkMapPage() {
         </div>
       </header>
 
-      {/* KPI Bar */}
-      {stats && (
-        <div className="nm-kpi-bar">
-          <div className="nm-kpi-card vendor">
-            <div className="nm-kpi-val">{stats.nVendor}</div>
-            <div className="nm-kpi-label">Vendors</div>
-          </div>
-          <div className="nm-kpi-card plant">
-            <div className="nm-kpi-val">{stats.nPlant}</div>
-            <div className="nm-kpi-label">Plants</div>
-          </div>
-          <div className="nm-kpi-card customer">
-            <div className="nm-kpi-val">{stats.nCust}</div>
-            <div className="nm-kpi-label">Customers</div>
-          </div>
-          <div className="nm-kpi-card gr">
-            <div className="nm-kpi-val">{fmt(stats.milkKg + stats.procKg)}</div>
-            <div className="nm-kpi-label">Total GR Volume</div>
-            <div className="nm-kpi-sub">kg</div>
-          </div>
-          <div className="nm-kpi-card gi">
-            <div className="nm-kpi-val">{fmt(stats.delKg)}</div>
-            <div className="nm-kpi-label">Total GI Volume</div>
-            <div className="nm-kpi-sub">kg</div>
-          </div>
-          <div className="nm-kpi-card sto">
-            <div className="nm-kpi-val">{stats.nEdge}</div>
-            <div className="nm-kpi-label">Total Flows</div>
-          </div>
-        </div>
-      )}
 
       {/* Main */}
       <main className="nm-main">
@@ -1020,6 +998,7 @@ export default function NetworkMapPage() {
                     selectedIds={vendorFilter}
                     toggleSelection={(id) => toggleMulti(vendorFilter, setVendorFilter, id)}
                     prefixToRemove="VDR_"
+                    pinnedIds={['VDR_0000700000']}
                   />
                   {vendorFilter.length > 0 && <div className="nm-chips">
                     {vendorFilter.map(id => { const v = uniqueVendors.find(x => x.id === id); return (
@@ -1038,6 +1017,7 @@ export default function NetworkMapPage() {
                     selectedIds={plantFilter}
                     toggleSelection={(id) => toggleMulti(plantFilter, setPlantFilter, id)}
                     prefixToRemove="PLT_"
+                    pinnedIds={['PLT_3003']}
                   />
                   {plantFilter.length > 0 && <div className="nm-chips">
                     {plantFilter.map(id => { const p = uniquePlants.find(x => x.id === id); return (

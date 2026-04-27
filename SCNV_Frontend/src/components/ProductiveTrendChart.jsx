@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { BarChart3 } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart3, TrendingUp } from 'lucide-react';
 import { API_URL, STORAGE_KEYS } from '../config/constants';
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -50,6 +50,7 @@ const renderCustomLegend = (props) => {
 function ProductiveTrendChart({ selectedCountry }) {
   const [trendData, setTrendData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [viewType, setViewType] = useState('bar'); // 'bar' or 'histogram'
 
   useEffect(() => {
     setLoading(true);
@@ -72,8 +73,8 @@ function ProductiveTrendChart({ selectedCountry }) {
   }, [selectedCountry]);
 
   return (
-    <section className="chart-section" id="productive-trend-chart">
-      <div className="chart-section__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <section className="chart-section" id="productive-trend-chart" style={{ gridColumn: '1 / -1', width: '100%' }}>
+      <div className="chart-section__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div className="chart-section__title-group">
           <div className="chart-section__icon">
             <BarChart3 size={20} />
@@ -86,15 +87,64 @@ function ProductiveTrendChart({ selectedCountry }) {
           </div>
         </div>
         
-        {/* Custom Header Legend */}
-        <div style={{ display: 'flex', gap: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div className="status-dot status-dot--green status-dot--blinking" />
-            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-sec)' }}>Productive</span>
+        {/* Toggle and Legend */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+          {/* View Toggle */}
+          <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(15, 23, 42, 0.6)', padding: '0.375rem', borderRadius: '0.625rem', border: '1px solid rgba(71, 85, 105, 0.3)' }}>
+            <button
+              onClick={() => setViewType('bar')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: viewType === 'bar' ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                border: viewType === 'bar' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent',
+                borderRadius: '0.5rem',
+                color: viewType === 'bar' ? '#10b981' : 'var(--color-muted)',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '600',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.375rem'
+              }}
+              onMouseEnter={(e) => e.target.style.background = viewType === 'bar' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(100, 116, 139, 0.1)'}
+              onMouseLeave={(e) => e.target.style.background = viewType === 'bar' ? 'rgba(16, 185, 129, 0.2)' : 'transparent'}
+            >
+              <BarChart3 size={14} /> Bar Chart
+            </button>
+            <button
+              onClick={() => setViewType('histogram')}
+              style={{
+                padding: '0.5rem 1rem',
+                background: viewType === 'histogram' ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                border: viewType === 'histogram' ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
+                borderRadius: '0.5rem',
+                color: viewType === 'histogram' ? '#3b82f6' : 'var(--color-muted)',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '600',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.375rem'
+              }}
+              onMouseEnter={(e) => e.target.style.background = viewType === 'histogram' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(100, 116, 139, 0.1)'}
+              onMouseLeave={(e) => e.target.style.background = viewType === 'histogram' ? 'rgba(59, 130, 246, 0.2)' : 'transparent'}
+            >
+              <TrendingUp size={14} /> Histogram
+            </button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div className="status-dot status-dot--red status-dot--blinking" />
-            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-sec)' }}>Unproductive</span>
+
+          {/* Custom Header Legend */}
+          <div style={{ display: 'flex', gap: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="status-dot status-dot--green status-dot--blinking" />
+              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-sec)' }}>Productive</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className="status-dot status-dot--red status-dot--blinking" />
+              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text-sec)' }}>Unproductive</span>
+            </div>
           </div>
         </div>
       </div>
@@ -106,51 +156,103 @@ function ProductiveTrendChart({ selectedCountry }) {
           <div className="chart-section__empty">No trend data available</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={trendData} barGap={8} barCategoryGap="25%">
-              <defs>
-                <linearGradient id="barGradientProductive" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#059669" stopOpacity={0.8} />
-                </linearGradient>
-                <linearGradient id="barGradientUnproductive" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#ef4444" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis 
-                dataKey="month" 
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11, fill: '#64748b' }} 
-                dy={10}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 11, fill: '#64748b' }}
-                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                dx={-10}
-              />
-              <Tooltip cursor={{ fill: 'rgba(241, 245, 249, 0.4)' }} content={<CustomTooltip />} />
-              <Bar
-                dataKey="productive"
-                name="Productive"
-                fill="url(#barGradientProductive)"
-                radius={[6, 6, 0, 0]}
-                animationDuration={1200}
-                activeBar={{ fill: '#10b981', stroke: '#059669', strokeWidth: 1 }}
-              />
-              <Bar
-                dataKey="unproductive"
-                name="Unproductive"
-                fill="url(#barGradientUnproductive)"
-                radius={[6, 6, 0, 0]}
-                animationDuration={1200}
-                animationBegin={300}
-                activeBar={{ fill: '#ef4444', stroke: '#dc2626', strokeWidth: 1 }}
-              />
-            </BarChart>
+            {viewType === 'bar' ? (
+              <BarChart data={trendData} barGap={8} barCategoryGap="25%">
+                <defs>
+                  <linearGradient id="barGradientProductive" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#059669" stopOpacity={0.8} />
+                  </linearGradient>
+                  <linearGradient id="barGradientUnproductive" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ef4444" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#dc2626" stopOpacity={0.8} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="month" 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: '#64748b' }} 
+                  dy={10}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                  dx={-10}
+                />
+                <Tooltip cursor={{ fill: 'rgba(241, 245, 249, 0.4)' }} content={<CustomTooltip />} />
+                <Bar
+                  dataKey="productive"
+                  name="Productive"
+                  fill="url(#barGradientProductive)"
+                  radius={[6, 6, 0, 0]}
+                  animationDuration={1200}
+                  activeBar={{ fill: '#10b981', stroke: '#059669', strokeWidth: 1 }}
+                />
+                <Bar
+                  dataKey="unproductive"
+                  name="Unproductive"
+                  fill="url(#barGradientUnproductive)"
+                  radius={[6, 6, 0, 0]}
+                  animationDuration={1200}
+                  animationBegin={300}
+                  activeBar={{ fill: '#ef4444', stroke: '#dc2626', strokeWidth: 1 }}
+                />
+              </BarChart>
+            ) : (
+              <LineChart data={trendData}>
+                <defs>
+                  <linearGradient id="lineGradientProductive" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.8} />
+                    <stop offset="100%" stopColor="#10b981" stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="lineGradientUnproductive" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ef4444" stopOpacity={0.8} />
+                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="month" 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: '#64748b' }} 
+                  dy={10}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                  dx={-10}
+                />
+                <Tooltip cursor={{ stroke: 'rgba(100, 116, 139, 0.2)' }} content={<CustomTooltip />} />
+                <Line
+                  type="monotone"
+                  dataKey="productive"
+                  name="Productive"
+                  stroke="#10b981"
+                  strokeWidth={3}
+                  dot={{ fill: '#10b981', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 7 }}
+                  animationDuration={1200}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="unproductive"
+                  name="Unproductive"
+                  stroke="#ef4444"
+                  strokeWidth={3}
+                  dot={{ fill: '#ef4444', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 7 }}
+                  animationDuration={1200}
+                  animationBegin={300}
+                />
+              </LineChart>
+            )}
           </ResponsiveContainer>
         )}
       </div>
